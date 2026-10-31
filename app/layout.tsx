@@ -52,12 +52,12 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Bonbon Flowers Houston",
-  description: "Luxury floral boutique in Houston, TX with same-day hand delivery",
+  title: "Venpide | Delivery de Restaurantes & Logística Moto Taxi",
+  description: "Plataforma de delivery para restaurantes, comercios y envíos express en moto taxi",
   manifest: "/manifest.json",
   icons: {
-    icon: "https://bonbonflowershouston.com/logo.png",
-    apple: "https://bonbonflowershouston.com/logo.png",
+    icon: "/logo.png",
+    apple: "/logo.png",
   },
 };
 
@@ -80,7 +80,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${playfair.variable} ${montserrat.variable} ${plusJakarta.variable} ${manrope.variable} ${greatVibes.variable}`} suppressHydrationWarning>
       <head>
-        <link rel="icon" href="https://bonbonflowershouston.com/logo.png" />
+        <link rel="icon" href="/logo.png" />
         <link rel="preconnect" href="https://ik.imagekit.io" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://ik.imagekit.io" />

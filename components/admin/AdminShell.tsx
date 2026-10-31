@@ -25,6 +25,11 @@ interface AdminShellProps {
 
 export const ADMIN_NAV_ITEMS = [
   {
+    href: "/admin/whatsapp",
+    label: "WhatsApp CRM & Drivers",
+    icon: "💬",
+  },
+  {
     href: "/admin/ordenes",
     label: "Órdenes & Despacho",
     icon: "🛍️",
@@ -124,7 +129,7 @@ export function AdminShell({ children, logoutAction }: AdminShellProps) {
   const activeItem = ADMIN_NAV_ITEMS.find((item) => pathname?.startsWith(item.href)) || {
     href: "/admin",
     label: "Panel Principal",
-    icon: "🌸",
+    icon: "🛵",
   };
 
   return (
@@ -171,21 +176,21 @@ export function AdminShell({ children, logoutAction }: AdminShellProps) {
               if (isOverlayMode) setIsOverlayOpen(false);
             }}
           >
-            <div className="w-10 h-10 rounded-full border-2 border-[#FF97A4] overflow-hidden bg-white dark:bg-pink-950/40 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform p-0.5">
+            <div className="w-10 h-10 rounded-full border-2 border-emerald-500 overflow-hidden bg-white dark:bg-stone-900 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform p-0.5">
               <img
                 src="/logo.png"
-                alt="Bonbon Flowers Logo"
+                alt="Venpide Logo"
                 className="w-full h-full object-contain rounded-full"
               />
             </div>
 
             {(!isCollapsed || isOverlayMode || isMobileOpen) && (
               <div className="truncate">
-                <span className="font-serif font-black text-sm text-gray-900 dark:text-white block leading-tight truncate group-hover:text-[#B0004A] transition-colors">
-                  Bonbon Flowers
+                <span className="font-sans font-black text-sm text-gray-900 dark:text-white block leading-tight truncate group-hover:text-emerald-600 transition-colors">
+                  Venpide Delivery
                 </span>
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block truncate">
-                  Admin Console
+                  Admin Central
                 </span>
               </div>
             )}

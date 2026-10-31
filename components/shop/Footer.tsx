@@ -44,27 +44,26 @@ export function Footer({ siteConfig }: FooterProps) {
           <div>
             <div className="flex items-center gap-3 mb-3">
               <img
-                src={siteConfig?.logoUrl || "https://bonbonflowershouston.com/logo.png"}
-                alt="Bonbon Flowers Logo"
-                className="w-8 h-8 rounded-full object-cover border border-[#C5A059] dark:border-[#5EEAD4]/40"
+                src={siteConfig?.logoUrl || "/logo.png"}
+                alt="Venpide Logo"
+                className="w-8 h-8 rounded-full object-cover border border-emerald-500"
               />
               <h3
                 className="font-black text-xs uppercase tracking-wider font-serif"
                 style={{ color: "var(--theme-footer-accent, var(--theme-heading, #163422))" }}
               >
-                Hours of operation
+                {isSpanish ? "Horario de Despacho & Atención" : "Hours of operation"}
               </h3>
             </div>
             <p className="opacity-80 leading-relaxed text-xs font-medium">
-              Monday to Friday: 9 AM - 6 PM<br />
-              Saturday: 10 AM - 3 PM<br />
-              Sunday: Special event &amp; advance orders delivery
+              {isSpanish ? "Lunes a Domingo: 8:00 AM - 11:00 PM" : "Monday to Sunday: 8:00 AM - 11:00 PM"}<br />
+              {isSpanish ? "Flota activa de moto taxis y repartidores urbanos." : "Active fleet of moto couriers and drivers."}
             </p>
             <p
               className="mt-3 text-[11px] font-bold tracking-wide"
               style={{ color: "var(--theme-footer-accent, var(--theme-accent, #163422))" }}
             >
-              Houston, TX &amp; Metro Area • Same Day Delivery Available
+              {siteConfig?.footerSlogan || "Venpide • Plataforma de Delivery, Restaurantes & Moto Taxi"}
             </p>
           </div>
 
@@ -175,7 +174,7 @@ export function Footer({ siteConfig }: FooterProps) {
         {/* Copyright y Enlaces Legales */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-y-2 text-[11px] text-stone-600 dark:text-[#76C7B2] text-center font-medium">
           <span>
-            © {new Date().getFullYear()}, Bonbon Flowers Houston. All rights reserved.
+            © {new Date().getFullYear()}, Venpide. All rights reserved.
           </span>
           <span className="hidden sm:inline mx-2 text-stone-400">·</span>
           <div className="flex flex-wrap justify-center gap-x-2 text-stone-800 dark:text-[#B9E6D3]">

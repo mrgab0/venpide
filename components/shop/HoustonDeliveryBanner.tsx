@@ -40,17 +40,17 @@ export function HoustonDeliveryBanner({
             {/* Tag destacado con contraste */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#5EEAD4]/20 border border-[#5EEAD4]/60 text-[#5EEAD4] text-xs font-black uppercase tracking-wider shadow-sm">
               <span className="w-2.5 h-2.5 rounded-full bg-[#5EEAD4] animate-pulse" />
-              <span>{isSpanish ? "Entregas Rápidas y Garantizadas en Houston" : "Fast & Guaranteed Delivery Across Houston"}</span>
+              <span>{isSpanish ? "Logística y Delivery Express Venpide" : "Venpide Express Delivery & Logistics"}</span>
             </div>
 
             <h3 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-black tracking-tight text-white leading-tight drop-shadow-sm">
-              {isSpanish ? "¿Necesitas una entrega hoy mismo en tu vecindario?" : "Need a same-day delivery to your neighborhood?"}
+              {isSpanish ? "¿Quieres pedir de tus restaurantes o necesitas un moto taxi?" : "Craving food or need an express moto courier?"}
             </h3>
 
             <p className="text-sm sm:text-base text-emerald-100/90 dark:text-stone-200 font-medium leading-relaxed">
               {isSpanish
-                ? "Llevamos tus arreglos en vehículos climatizados directamente a la puerta de tu ser querido con atención de guante blanco y confirmación por fotografía."
-                : "We deliver your floral designs in climate-controlled vehicles directly to your loved one's door with white-glove service and photo confirmation."}
+                ? "Conectamos clientes, establecimientos y conductores de moto taxi en tiempo récord. Comunícate directamente por WhatsApp y sigue tu entrega en vivo."
+                : "Connecting customers, stores, and express drivers in minutes. Message us directly on WhatsApp and track your order in real time."}
             </p>
 
             {/* Chips de vecindarios con contraste AAA */}

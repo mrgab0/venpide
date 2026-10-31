@@ -50,6 +50,16 @@ export interface IDoorDashConfig {
   autoDispatchEnabled?: boolean;
 }
 
+export interface IMetaWhatsAppConfig {
+  phoneNumberId?: string;
+  wabaId?: string;
+  accessToken?: string;
+  verifyToken?: string;
+  webhookUrl?: string;
+  autoForwardToDriver?: boolean;
+  autoForwardToCustomer?: boolean;
+}
+
 export interface ISiteConfig extends Document {
   key: string; // "global"
   heroTitle: string;
@@ -159,17 +169,20 @@ export interface ISiteConfig extends Document {
   // Integración y Verificación de DoorDash Drive
   doordashConfig?: IDoorDashConfig;
 
+  // Integración de Meta Cloud API WhatsApp
+  metaWhatsAppConfig?: IMetaWhatsAppConfig;
+
   updatedAt: Date;
 }
 
 const SiteConfigSchema: Schema = new Schema({
   key: { type: String, required: true, unique: true, default: "global" },
-  heroTitle: { type: String, default: "Bonbon Flowers Houston" },
-  heroSlogan: { type: String, default: "Arreglos florales exclusivos y detalles de lujo diseñados para sorprender a quien más amas." },
-  heroButtonText: { type: String, default: "Explorar Colección" },
-  footerTitle: { type: String, default: "Bonbon Flowers Houston" },
-  footerSlogan: { type: String, default: "Boutique Digital de Alta Floristería • Houston, Texas" },
-  footerCopyright: { type: String, default: "© 2026 Bonbon Flowers Houston. Todos los derechos reservados." },
+  heroTitle: { type: String, default: "Venpide | Delivery & Logística Express" },
+  heroSlogan: { type: String, default: "Pide de tus restaurantes y comercios preferidos con entrega inmediata en moto taxi." },
+  heroButtonText: { type: String, default: "Pedir Ahora" },
+  footerTitle: { type: String, default: "Venpide" },
+  footerSlogan: { type: String, default: "Plataforma de Delivery, Restaurantes & Moto Taxi" },
+  footerCopyright: { type: String, default: "© 2026 Venpide. Todos los derechos reservados." },
 
   // Personalización del Home & Cuadrícula (Por defecto 3 columnas en escritorio = Preservación 100%)
   productColumnsDesktop: { type: Number, default: 3 },
@@ -182,14 +195,14 @@ const SiteConfigSchema: Schema = new Schema({
   heroCustomProductIds: { type: [String], default: [] },
 
   // Identidad de Marca y Menú
-  logoUrl: { type: String, default: "https://bonbonflowershouston.com/logo.png" },
-  brandSlogan: { type: String, default: "Boutique Floral Digital • Houston, Texas" },
+  logoUrl: { type: String, default: "/logo.png" },
+  brandSlogan: { type: String, default: "Delivery Express & Moto Taxi" },
   menuHomeLabel: { type: String, default: "Inicio" },
-  menuCatalogLabel: { type: String, default: "Colección" },
-  menuTrackingLabel: { type: String, default: "📦 Rastreo" },
+  menuCatalogLabel: { type: String, default: "Restaurantes & Menús" },
+  menuTrackingLabel: { type: String, default: "🛵 Rastreo de Envíos" },
   menuAboutLabel: { type: String, default: "Nosotros" },
   menuContactLabel: { type: String, default: "Contacto" },
-  primaryColor: { type: String, default: "#FF97A4" },
+  primaryColor: { type: String, default: "#E11D48" },
 
   // Redes Sociales en Cabecera
   enableHeaderSocials: { type: Boolean, default: true },
@@ -340,10 +353,21 @@ const SiteConfigSchema: Schema = new Schema({
     keyId: { type: String, default: "" },
     signingSecret: { type: String, default: "" },
     storeId: { type: String, default: "" },
-    pickupInstructions: { type: String, default: "Recoger arreglo floral en el mostrador. Manipular en posición vertical." },
+    pickupInstructions: { type: String, default: "Recoger pedido en mostrador." },
     leadTimeMinutes: { type: Number, default: 30 },
     environment: { type: String, default: "production" },
     autoDispatchEnabled: { type: Boolean, default: false },
+  },
+
+  // Integración de Meta Cloud API WhatsApp & CRM
+  metaWhatsAppConfig: {
+    phoneNumberId: { type: String, default: "" },
+    wabaId: { type: String, default: "" },
+    accessToken: { type: String, default: "" },
+    verifyToken: { type: String, default: "venpide_webhook_token_2026" },
+    webhookUrl: { type: String, default: "/api/webhook/whatsapp" },
+    autoForwardToDriver: { type: Boolean, default: true },
+    autoForwardToCustomer: { type: Boolean, default: true },
   },
 
   updatedAt: { type: Date, default: Date.now }

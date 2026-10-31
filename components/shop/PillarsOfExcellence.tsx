@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Clock, PenTool, Sparkles, UserCheck } from "lucide-react";
+import { Clock, Bike, UtensilsCrossed, ShieldCheck } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 export function PillarsOfExcellence() {
@@ -10,40 +10,40 @@ export function PillarsOfExcellence() {
 
   const pillars = [
     {
-      id: "mismo-dia",
-      title: isSpanish ? "Entrega Mismo Día" : "Same-Day Delivery",
+      id: "entrega-express",
+      title: isSpanish ? "Entrega Express en Moto Taxi" : "Express Delivery by Moto",
       description: isSpanish
-        ? "Ordenando antes de la 1:00 PM con ventana garantizada."
-        : "Order before 1:00 PM with guaranteed window.",
+        ? "Tus pedidos entregados en minutos en cualquier zona de la ciudad."
+        : "Fast delivery directly to your door in record time.",
+      icon: Bike,
+      badge: isSpanish ? "EXPRESS" : "FAST DISPATCH",
+    },
+    {
+      id: "rastreo-whatsapp",
+      title: isSpanish ? "Rastreo Directo en WhatsApp" : "Live WhatsApp Tracking",
+      description: isSpanish
+        ? "Contacto en tiempo real con tu repartidor y la central de despacho."
+        : "Real-time communication with your assigned driver.",
       icon: Clock,
-      badge: "SAME DAY",
+      badge: isSpanish ? "EN VIVO" : "LIVE CHAT",
     },
     {
-      id: "tarjeta-lujo",
-      title: isSpanish ? "Tarjeta de Lujo" : "Luxury Gift Card",
+      id: "restaurantes-variedad",
+      title: isSpanish ? "Restaurantes & Comercios" : "Top Restaurants & Stores",
       description: isSpanish
-        ? "Mensaje personalizado caligrafiado sin costo adicional."
-        : "Complimentary handwritten custom message.",
-      icon: PenTool,
-      badge: isSpanish ? "INCLUIDO" : "INCLUDED",
+        ? "La mayor variedad de platos, menús y productos locales."
+        : "Wide selection of local foods, restaurants, and shops.",
+      icon: UtensilsCrossed,
+      badge: isSpanish ? "SELECCIÓN" : "TOP FOOD",
     },
     {
-      id: "rosas-frescas",
-      title: isSpanish ? "Rosas Frescas 100% Naturales" : "100% Natural Fresh Roses",
+      id: "conductores-verificados",
+      title: isSpanish ? "Conductores Verificados" : "Verified Delivery Drivers",
       description: isSpanish
-        ? "Corte selecto de exportación con máxima apertura y aroma."
-        : "Select export-grade cut with maximum bloom and fragrance.",
-      icon: Sparkles,
-      badge: isSpanish ? "CALIDAD VIP" : "VIP QUALITY",
-    },
-    {
-      id: "white-glove",
-      title: "White-Glove Service",
-      description: isSpanish
-        ? "Entrega presencial con chofer capacitado y confirmación."
-        : "Hand delivery with trained driver and photo confirmation.",
-      icon: UserCheck,
-      badge: isSpanish ? "HOUSTON CHOFER" : "HOUSTON DRIVER",
+        ? "Flota de motorizados capacitados con entregas 100% seguras."
+        : "Certified drivers ensuring safe and timely handling.",
+      icon: ShieldCheck,
+      badge: isSpanish ? "SEGURIDAD VIP" : "VERIFIED",
     },
   ];
 
