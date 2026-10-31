@@ -33,41 +33,41 @@ export const StoreLocationSection: React.FC<StoreLocationSectionProps> = ({
         {/* Gradiente ambiental superior e inferior para integración visual */}
         <div className="absolute inset-0 bg-gradient-to-r from-white/30 via-transparent to-white/20 dark:from-[#0B0C10]/40 dark:via-transparent dark:to-[#0B0C10]/30 pointer-events-none" />
 
-        {/* Pin animado en Houston, TX */}
+        {/* Pin animado en el mapa */}
         <div className="absolute left-[50%] md:left-[55%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center pointer-events-none">
-          <div className="text-[#163422] dark:text-[#5EEAD4] animate-bounce drop-shadow-lg">
+          <div className="text-emerald-600 animate-bounce drop-shadow-lg">
             <MapPin size={38} fill="currentColor" className="text-white dark:text-stone-950" />
           </div>
-          <span className="bg-white dark:bg-stone-900 text-black dark:text-white text-[10px] sm:text-[11px] font-black px-3 py-0.5 rounded-full shadow-md border-2 border-[#163422] dark:border-[#5EEAD4] uppercase tracking-wider -mt-1 whitespace-nowrap">
-            Bonbon Flowers Houston
+          <span className="bg-white dark:bg-stone-900 text-black dark:text-white text-[10px] sm:text-[11px] font-black px-3 py-0.5 rounded-full shadow-md border-2 border-emerald-600 uppercase tracking-wider -mt-1 whitespace-nowrap">
+            Venpide Central &amp; Despacho
           </span>
         </div>
 
         {/* Marca de agua informativa en el mapa */}
         <div className="absolute bottom-3 left-3 sm:left-6 z-10 text-[10px] sm:text-[11px] text-black dark:text-white bg-white/85 dark:bg-black/80 backdrop-blur-xs px-2.5 py-1 rounded-md font-sans flex items-center gap-1.5 sm:gap-2 select-none shadow-xs">
-          <span className="font-bold text-black dark:text-white tracking-tight">Houston Metro Map</span>
-          <span className="font-medium text-stone-700 dark:text-gray-300">• 9546 Hammerly Blvd</span>
+          <span className="font-bold text-black dark:text-white tracking-tight">Venpide Logistics Map</span>
+          <span className="font-medium text-stone-700 dark:text-gray-300">• Cobertura y Despacho Moto Taxi</span>
         </div>
       </div>
 
-      {/* 2. Tarjeta con información del estudio: en móvil se ubica abajo del mapa sin taparlo; en desktop flota en la esquina izquierda */}
+      {/* 2. Tarjeta con información del hub: en móvil se ubica abajo del mapa sin taparlo; en desktop flota en la esquina izquierda */}
       <div className="relative z-20 w-full p-5 sm:p-6 md:p-7 md:absolute md:top-8 md:left-12 md:max-w-sm md:w-full bg-white dark:bg-[#12131A] md:bg-white/95 md:dark:bg-[#12131A]/95 md:backdrop-blur-md md:rounded-2xl border-t md:border border-stone-200 dark:border-stone-800 md:shadow-2xl text-stone-900 dark:text-[#E6F7F0]">
-        <div className="inline-flex items-center gap-1.5 bg-stone-100 dark:bg-stone-900/80 text-[#163422] dark:text-[#5EEAD4] text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider mb-3 border border-[#163422]/20 dark:border-[#5EEAD4]/30">
+        <div className="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider mb-3 border border-emerald-600/30">
           <MapPin size={11} />
-          <span>Houston Floral Studio</span>
+          <span>Central de Despacho &amp; Flota</span>
         </div>
 
-        <h3 className="text-base font-black text-stone-900 dark:text-[#E6F7F0] uppercase tracking-wider mb-1 font-serif">
-          Pick-Up &amp; Delivery Hub
+        <h3 className="text-base font-black text-stone-900 dark:text-[#E6F7F0] uppercase tracking-wider mb-1 font-sans">
+          Hub Logístico Venpide
         </h3>
         <p className="text-stone-800 dark:text-[#B9E6D3] text-xs sm:text-sm leading-relaxed mb-4 font-medium">
           <strong className="text-stone-950 dark:text-white font-bold block text-sm">
-            9546 Hammerly Boulevard, Houston, TX 77080
+            Base Central de Conductores y Motorizados
           </strong>
           <span className="text-[11.5px] text-stone-600 dark:text-[#76C7B2] font-semibold block mt-1">
             {isSpanish
-              ? "Spring Branch West • Retiro en taller y entregas a domicilio el mismo día en todo Houston."
-              : "Spring Branch West • Studio pickup & same-day delivery throughout Houston."}
+              ? "Atención a restaurantes, comercios y usuarios con despachos inmediatos en moto taxi."
+              : "Serving partner restaurants, stores, and users with instant moto taxi dispatch."}
           </span>
         </p>
 
