@@ -153,7 +153,33 @@ export async function assignDriverToChatAction(chatId: string, driverId: string)
       return { success: false, error: "Conductor no encontrado" };
     }
 
-    // Asignar conductor al chat
+    const previousDriver = chat.assignedDriver;
+    const isReassignment = previousDriver && previousDriver.driverId !== driver._id.toString();
+
+    // 1. Si es una reasignación, liberar al conductor anterior y avisarle
+    if (isReassignment) {
+      await Driver.findByIdAndUpdate(previousDriver.driverId, {
+        status: "available",
+        activeChatId: "",
+        activeOrderId: "",
+      });
+
+      await sendMetaWhatsAppMessage({
+        to: previousDriver.phone,
+        text: `⚠️ Atención: El pedido de ${chat.customerName} ha sido reasignado a otro conductor por la central. Tu estatus ha pasado a disponible.`,
+      });
+
+      await WhatsAppMessage.create({
+        chatId: normalizedChatId,
+        senderType: "system",
+        senderName: "Sistema Venpide",
+        text: `🔄 Conductor Reasignado: cambió de ${previousDriver.name} a ${driver.name} (${driver.vehicleType.toUpperCase()} ${driver.plate ? `[${driver.plate}]` : ""}).`,
+        status: "delivered",
+        createdAt: new Date(),
+      });
+    }
+
+    // 2. Asignar nuevo conductor al chat
     chat.assignedDriver = {
       driverId: driver._id.toString(),
       name: driver.name,
@@ -163,32 +189,36 @@ export async function assignDriverToChatAction(chatId: string, driverId: string)
       assignedAt: new Date(),
     };
     chat.status = "assigned";
-    chat.lastMessage = `🛵 Driver asignado: ${driver.name} (${driver.vehicleType})`;
+    chat.lastMessage = `🛵 Driver ${isReassignment ? "reasignado" : "asignado"}: ${driver.name} (${driver.vehicleType})`;
     chat.lastSender = "system";
     chat.lastMessageAt = new Date();
     await chat.save();
 
-    // Actualizar estado del driver
+    // 3. Actualizar estado del nuevo driver
     driver.status = "busy";
     driver.activeChatId = normalizedChatId;
     driver.totalDeliveries = (driver.totalDeliveries || 0) + 1;
     await driver.save();
 
-    // Crear mensaje del sistema en la conversación
-    await WhatsAppMessage.create({
-      chatId: normalizedChatId,
-      senderType: "system",
-      senderName: "Sistema Venpide",
-      text: `🛵 Conductor asignado: ${driver.name} • Vehículo: ${driver.vehicleType.toUpperCase()} ${driver.plate ? `[${driver.plate}]` : ""}. Teléfono: ${driver.phone}`,
-      status: "delivered",
-      createdAt: new Date(),
-    });
+    // Si no fue reasignación, registrar el mensaje inicial de asignación
+    if (!isReassignment) {
+      await WhatsAppMessage.create({
+        chatId: normalizedChatId,
+        senderType: "system",
+        senderName: "Sistema Venpide",
+        text: `🛵 Conductor asignado: ${driver.name} • Vehículo: ${driver.vehicleType.toUpperCase()} ${driver.plate ? `[${driver.plate}]` : ""}. Teléfono: ${driver.phone}`,
+        status: "delivered",
+        createdAt: new Date(),
+      });
+    }
 
-    // Enviar notificación por WhatsApp al Conductor con detalles del cliente y orden
-    const driverAlert = `🛵 ¡Nuevo servicio asignado en Venpide!
+    // 4. Enviar notificación por WhatsApp al nuevo conductor
+    const driverAlert = `🛵 ¡Nuevo servicio ${isReassignment ? "REASIGNADO" : "asignado"} en Venpide!
 Cliente: ${chat.customerName}
 Teléfono: ${chat.customerPhone}
 Orden Ref: ${chat.orderId || "Entrega directa"}
+Restaurante: ${chat.restaurantName || "No especificado"}
+Dirección: ${chat.deliveryAddress || "Por coordinar en el chat"}
 Por favor abre comunicación con el cliente o responde este mensaje para actualizar el estatus.`;
 
     await sendMetaWhatsAppMessage({
@@ -196,8 +226,11 @@ Por favor abre comunicación con el cliente o responde este mensaje para actuali
       text: driverAlert,
     });
 
-    // Enviar mensaje de cortesía al cliente informando de su chofer
-    const customerAlert = `¡Hola ${chat.customerName}! Tu conductor ${driver.name} (${driver.vehicleType.toUpperCase()}) ha sido asignado para tu entrega. Cualquier mensaje que envíes por aquí llegará tanto al conductor como a la central.`;
+    // 5. Enviar mensaje de cortesía al cliente informando de su chofer
+    const customerAlert = isReassignment
+      ? `¡Hola ${chat.customerName}! Te informamos que hemos actualizado tu conductor a ${driver.name} (${driver.vehicleType.toUpperCase()} ${driver.plate ? `[${driver.plate}]` : ""}). Ya está al tanto de tu pedido.`
+      : `¡Hola ${chat.customerName}! Tu conductor ${driver.name} (${driver.vehicleType.toUpperCase()} ${driver.plate ? `[${driver.plate}]` : ""}) ha sido asignado para tu entrega. Cualquier mensaje que envíes por aquí llegará tanto al conductor como a la central.`;
+
     await sendMetaWhatsAppMessage({
       to: chat.customerPhone,
       text: customerAlert,
@@ -210,6 +243,159 @@ Por favor abre comunicación con el cliente o responde este mensaje para actuali
     };
   } catch (error: any) {
     console.error("Error al asignar conductor:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function unassignDriverAction(chatId: string) {
+  await dbConnect();
+  try {
+    const normalizedChatId = normalizeWhatsAppNumber(chatId);
+    const chat = await WhatsAppChat.findOne({ chatId: normalizedChatId });
+    if (!chat) return { success: false, error: "Conversación no encontrada" };
+
+    const previousDriver = chat.assignedDriver;
+    if (previousDriver?.driverId) {
+      await Driver.findByIdAndUpdate(previousDriver.driverId, {
+        status: "available",
+        activeChatId: "",
+        activeOrderId: "",
+      });
+
+      await sendMetaWhatsAppMessage({
+        to: previousDriver.phone,
+        text: `⚠️ Has sido desasignado de la entrega de ${chat.customerName}. Estatus disponible.`,
+      });
+    }
+
+    chat.assignedDriver = undefined;
+    chat.status = "open";
+    chat.lastMessage = "Conductor desasignado por el administrador";
+    chat.lastSender = "system";
+    chat.lastMessageAt = new Date();
+    await chat.save();
+
+    await WhatsAppMessage.create({
+      chatId: normalizedChatId,
+      senderType: "system",
+      senderName: "Sistema Venpide",
+      text: `⚠️ Conductor ${previousDriver?.name || ""} desasignado. El pedido queda abierto a la espera de un nuevo repartidor.`,
+      status: "delivered",
+      createdAt: new Date(),
+    });
+
+    revalidatePath("/admin/whatsapp");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error al desasignar conductor:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function cancelDeliveryAction(chatId: string, reason: string) {
+  await dbConnect();
+  try {
+    const normalizedChatId = normalizeWhatsAppNumber(chatId);
+    const chat = await WhatsAppChat.findOne({ chatId: normalizedChatId });
+    if (!chat) return { success: false, error: "Conversación no encontrada" };
+
+    const assignedDriver = chat.assignedDriver;
+    if (assignedDriver?.driverId) {
+      await Driver.findByIdAndUpdate(assignedDriver.driverId, {
+        status: "available",
+        activeChatId: "",
+        activeOrderId: "",
+      });
+
+      await sendMetaWhatsAppMessage({
+        to: assignedDriver.phone,
+        text: `❌ Pedido CANCELADO por la central: La carrera de ${chat.customerName} ha sido cancelada. Motivo: ${reason || "No especificado"}.`,
+      });
+    }
+
+    chat.status = "cancelled";
+    chat.cancellationReason = reason || "Cancelado por el administrador";
+    chat.lastMessage = `❌ Delivery Cancelado: ${reason || "Por administración"}`;
+    chat.lastSender = "system";
+    chat.lastMessageAt = new Date();
+    await chat.save();
+
+    await WhatsAppMessage.create({
+      chatId: normalizedChatId,
+      senderType: "system",
+      senderName: "Sistema Venpide",
+      text: `❌ Delivery CANCELADO por el administrador. Motivo: ${reason || "Cancelación directa"}.`,
+      status: "delivered",
+      createdAt: new Date(),
+    });
+
+    // Notificar al cliente amablemente
+    await sendMetaWhatsAppMessage({
+      to: chat.customerPhone,
+      text: `Estimado(a) ${chat.customerName}, le informamos que su solicitud de entrega ha sido cancelada. Motivo: ${reason || "Cancelación solicitada"}. Si tiene dudas, puede escribirnos por este medio.`,
+    });
+
+    revalidatePath("/admin/whatsapp");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error al cancelar delivery:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateDeliveryDetailsAction(
+  chatId: string,
+  data: {
+    orderId?: string;
+    restaurantName?: string;
+    deliveryAddress?: string;
+    totalAmount?: number;
+    notes?: string;
+    customerName?: string;
+  }
+) {
+  await dbConnect();
+  try {
+    const normalizedChatId = normalizeWhatsAppNumber(chatId);
+    const chat = await WhatsAppChat.findOne({ chatId: normalizedChatId });
+    if (!chat) return { success: false, error: "Conversación no encontrada" };
+
+    if (data.orderId !== undefined) chat.orderId = data.orderId.trim();
+    if (data.restaurantName !== undefined) chat.restaurantName = data.restaurantName.trim();
+    if (data.deliveryAddress !== undefined) chat.deliveryAddress = data.deliveryAddress.trim();
+    if (data.totalAmount !== undefined) chat.totalAmount = Number(data.totalAmount) || 0;
+    if (data.notes !== undefined) chat.notes = data.notes.trim();
+    if (data.customerName !== undefined && data.customerName.trim()) {
+      chat.customerName = data.customerName.trim();
+    }
+
+    chat.lastMessage = "Datos de logística actualizados";
+    chat.lastSender = "system";
+    chat.lastMessageAt = new Date();
+    await chat.save();
+
+    await WhatsAppMessage.create({
+      chatId: normalizedChatId,
+      senderType: "system",
+      senderName: "Sistema Venpide",
+      text: `✏️ Datos de orden actualizados: ${chat.orderId ? `Ref #${chat.orderId}` : ""} ${chat.restaurantName ? `• Local: ${chat.restaurantName}` : ""} ${chat.deliveryAddress ? `• Destino: ${chat.deliveryAddress}` : ""} ${chat.totalAmount ? `• Total: $${chat.totalAmount}` : ""}`.trim(),
+      status: "delivered",
+      createdAt: new Date(),
+    });
+
+    // Si hay un chofer asignado, avisarle del cambio de dirección u orden
+    if (chat.assignedDriver?.phone) {
+      await sendMetaWhatsAppMessage({
+        to: chat.assignedDriver.phone,
+        text: `📍 [Actualización de Orden] Cliente ${chat.customerName}:
+${chat.restaurantName ? `Restaurante: ${chat.restaurantName}\n` : ""}${chat.deliveryAddress ? `Nueva Dirección: ${chat.deliveryAddress}\n` : ""}${chat.totalAmount ? `Monto a cobrar: $${chat.totalAmount}\n` : ""}${chat.notes ? `Nota: ${chat.notes}` : ""}`.trim(),
+      });
+    }
+
+    revalidatePath("/admin/whatsapp");
+    return { success: true, chat: JSON.parse(JSON.stringify(chat)) };
+  } catch (error: any) {
+    console.error("Error al actualizar datos de entrega:", error);
     return { success: false, error: error.message };
   }
 }
@@ -240,8 +426,8 @@ export async function updateChatStatusAction(chatId: string, status: string) {
       createdAt: new Date(),
     });
 
-    // Si se marca como entregado o cerrado, liberar al conductor si estaba ocupado
-    if (["delivered", "closed"].includes(status) && chat.assignedDriver?.driverId) {
+    // Si se marca como entregado, cerrado o cancelado, liberar al conductor si estaba ocupado
+    if (["delivered", "closed", "cancelled"].includes(status) && chat.assignedDriver?.driverId) {
       await Driver.findByIdAndUpdate(chat.assignedDriver.driverId, {
         status: "available",
         activeChatId: "",

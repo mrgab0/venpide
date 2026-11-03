@@ -26,12 +26,20 @@ import {
   ChevronDown,
   Info,
   Radio,
+  MapPin,
+  Store,
+  DollarSign,
+  Ban,
+  UserMinus,
 } from "lucide-react";
 import {
   getWhatsAppChatsAction,
   getWhatsAppMessagesAction,
   sendAdminWhatsAppMessageAction,
   assignDriverToChatAction,
+  unassignDriverAction,
+  cancelDeliveryAction,
+  updateDeliveryDetailsAction,
   updateChatStatusAction,
   getDriversListAction,
   saveDriverAction,
@@ -64,6 +72,23 @@ export default function WhatsAppCrmPage() {
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isSimulatorModalOpen, setIsSimulatorModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isEditDeliveryModalOpen, setIsEditDeliveryModalOpen] = useState(false);
+
+  // Estados de Operaciones de Delivery
+  const [unassigningDriver, setUnassigningDriver] = useState(false);
+  const [cancelReason, setCancelReason] = useState("Cliente canceló el pedido");
+  const [customCancelReason, setCustomCancelReason] = useState("");
+  const [cancellingDelivery, setCancellingDelivery] = useState(false);
+  const [savingDeliveryDetails, setSavingDeliveryDetails] = useState(false);
+  const [deliveryForm, setDeliveryForm] = useState({
+    orderId: "",
+    restaurantName: "",
+    deliveryAddress: "",
+    totalAmount: "",
+    notes: "",
+    customerName: "",
+  });
 
   // Estado del formulario de Driver
   const [editingDriver, setEditingDriver] = useState<any | null>(null);
@@ -212,6 +237,86 @@ export default function WhatsAppCrmPage() {
       getWhatsAppMessagesAction(activeChatId).then((m) => {
         if (m.success && m.messages) setMessages(m.messages);
       });
+    }
+  };
+
+  const openEditDeliveryModal = () => {
+    if (!currentChat) return;
+    setDeliveryForm({
+      orderId: currentChat.orderId || "",
+      restaurantName: currentChat.restaurantName || "",
+      deliveryAddress: currentChat.deliveryAddress || "",
+      totalAmount: currentChat.totalAmount !== undefined && currentChat.totalAmount !== null ? String(currentChat.totalAmount) : "",
+      notes: currentChat.notes || "",
+      customerName: currentChat.customerName || "",
+    });
+    setIsEditDeliveryModalOpen(true);
+  };
+
+  const handleUnassignDriver = async () => {
+    if (!activeChatId || unassigningDriver) return;
+    if (!confirm("¿Deseas desasignar al conductor? El repartidor quedará disponible para otras carreras.")) return;
+    setUnassigningDriver(true);
+    const res = await unassignDriverAction(activeChatId);
+    setUnassigningDriver(false);
+    if (res.success) {
+      fetchChats();
+      fetchDrivers();
+      getWhatsAppMessagesAction(activeChatId).then((m) => {
+        if (m.success && m.messages) setMessages(m.messages);
+        scrollToBottom();
+      });
+    } else {
+      alert("Error al desasignar conductor: " + res.error);
+    }
+  };
+
+  const handleCancelDelivery = async () => {
+    if (!activeChatId || cancellingDelivery) return;
+    const finalReason = cancelReason === "Otro" ? customCancelReason.trim() : cancelReason;
+    if (!finalReason) {
+      alert("Por favor indica el motivo de la cancelación.");
+      return;
+    }
+    setCancellingDelivery(true);
+    const res = await cancelDeliveryAction(activeChatId, finalReason);
+    setCancellingDelivery(false);
+    if (res.success) {
+      setIsCancelModalOpen(false);
+      setCustomCancelReason("");
+      fetchChats();
+      fetchDrivers();
+      getWhatsAppMessagesAction(activeChatId).then((m) => {
+        if (m.success && m.messages) setMessages(m.messages);
+        scrollToBottom();
+      });
+    } else {
+      alert("Error al cancelar delivery: " + res.error);
+    }
+  };
+
+  const handleSaveDeliveryDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeChatId || savingDeliveryDetails) return;
+    setSavingDeliveryDetails(true);
+    const res = await updateDeliveryDetailsAction(activeChatId, {
+      orderId: deliveryForm.orderId,
+      restaurantName: deliveryForm.restaurantName,
+      deliveryAddress: deliveryForm.deliveryAddress,
+      totalAmount: deliveryForm.totalAmount ? Number(deliveryForm.totalAmount) : 0,
+      notes: deliveryForm.notes,
+      customerName: deliveryForm.customerName,
+    });
+    setSavingDeliveryDetails(false);
+    if (res.success) {
+      setIsEditDeliveryModalOpen(false);
+      fetchChats();
+      getWhatsAppMessagesAction(activeChatId).then((m) => {
+        if (m.success && m.messages) setMessages(m.messages);
+        scrollToBottom();
+      });
+    } else {
+      alert("Error al guardar datos de delivery: " + res.error);
     }
   };
 
@@ -421,6 +526,7 @@ export default function WhatsAppCrmPage() {
                 { id: "assigned", label: "Asignados" },
                 { id: "in_delivery", label: "En Ruta" },
                 { id: "delivered", label: "Entregados" },
+                { id: "cancelled", label: "Cancelados" },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -509,7 +615,9 @@ export default function WhatsAppCrmPage() {
 
                         <span
                           className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                            chat.status === "open"
+                            chat.status === "cancelled"
+                              ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300"
+                              : chat.status === "open"
                               ? "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300"
                               : chat.status === "assigned"
                               ? "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
@@ -518,7 +626,7 @@ export default function WhatsAppCrmPage() {
                               : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
                           }`}
                         >
-                          {chat.status}
+                          {chat.status === "cancelled" ? "Cancelado" : chat.status}
                         </span>
                       </div>
                     </div>
@@ -580,9 +688,26 @@ export default function WhatsAppCrmPage() {
                     <option value="in_delivery">En Entrega / En Ruta</option>
                     <option value="delivered">Entregado</option>
                     <option value="closed">Cerrado / Finalizado</option>
+                    <option value="cancelled">Cancelado ❌</option>
                   </select>
                 </div>
               </div>
+
+              {/* Alerta de Cancelación si aplica */}
+              {currentChat.status === "cancelled" && (
+                <div className="bg-red-50 dark:bg-red-950/50 border-b border-red-200 dark:border-red-900/60 p-3 flex items-center justify-between text-xs text-red-800 dark:text-red-200">
+                  <div className="flex items-center gap-2">
+                    <Ban size={16} className="text-red-600 shrink-0" />
+                    <div>
+                      <strong className="font-bold">Delivery Cancelado:</strong>{" "}
+                      <span>{currentChat.cancellationReason || "Cancelado por administración"}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-200 dark:bg-red-900 text-red-900 dark:text-red-100">
+                    Cancelado
+                  </span>
+                </div>
+              )}
 
               {/* Contenedor de Mensajes */}
               <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#EFEAE2]/30 dark:bg-[#0B0C10]">
@@ -758,21 +883,30 @@ export default function WhatsAppCrmPage() {
                     Placa: <strong className="font-mono text-gray-700 dark:text-stone-300">{currentChat.assignedDriver.plate}</strong>
                   </div>
                 )}
-                <div className="pt-1 flex items-center gap-2">
+                <div className="pt-1 flex items-center gap-1.5 flex-wrap">
                   <a
                     href={`https://wa.me/${currentChat.assignedDriver.phone}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex-1 text-center py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold transition-colors flex items-center justify-center gap-1"
+                    className="flex-1 text-center py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold transition-colors flex items-center justify-center gap-1"
                   >
-                    <MessageSquare size={10} /> Chat Conductor
+                    <MessageSquare size={10} /> WhatsApp
                   </a>
                   <a
                     href={`tel:${currentChat.assignedDriver.phone}`}
-                    className="py-1 px-2 rounded-lg bg-gray-200 dark:bg-stone-800 text-gray-700 dark:text-stone-300 text-[10px] font-bold hover:bg-gray-300 transition-colors"
+                    className="py-1.5 px-2.5 rounded-lg bg-gray-200 dark:bg-stone-800 text-gray-700 dark:text-stone-300 text-[10px] font-bold hover:bg-gray-300 transition-colors"
+                    title="Llamar"
                   >
                     <Phone size={10} />
                   </a>
+                  <button
+                    onClick={handleUnassignDriver}
+                    disabled={unassigningDriver}
+                    className="py-1.5 px-2 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-950/60 dark:hover:bg-red-900/60 text-red-700 dark:text-red-300 text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Desasignar conductor de esta entrega"
+                  >
+                    <UserMinus size={11} /> {unassigningDriver ? "..." : "Quitar"}
+                  </button>
                 </div>
               </div>
             ) : (
@@ -790,7 +924,7 @@ export default function WhatsAppCrmPage() {
             {/* Asignar o Reasignar Conductor */}
             <div className="space-y-1.5 pt-1">
               <label className="text-[10px] font-bold text-gray-400 block uppercase">
-                {currentChat?.assignedDriver ? "Reasignar Conductor:" : "Asignar de la Flota:"}
+                {currentChat?.assignedDriver ? "🔄 Reasignar a otro conductor:" : "🛵 Asignar de la Flota:"}
               </label>
               <div className="flex items-center gap-1.5">
                 <select
@@ -798,7 +932,9 @@ export default function WhatsAppCrmPage() {
                   onChange={(e) => setSelectedDriverId(e.target.value)}
                   className="flex-1 text-xs px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white focus:outline-none cursor-pointer"
                 >
-                  <option value="">Selecciona un chofer...</option>
+                  <option value="">
+                    {currentChat?.assignedDriver ? "Selecciona nuevo chofer..." : "Selecciona un chofer..."}
+                  </option>
                   {drivers.map((d) => (
                     <option key={d._id} value={d._id}>
                       {d.name} ({d.vehicleType.toUpperCase()}) - {d.status === "available" ? "🟢 Disponible" : "🟡 Ocupado"}
@@ -810,7 +946,7 @@ export default function WhatsAppCrmPage() {
                   disabled={!selectedDriverId || assigningDriver}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
-                  {assigningDriver ? "..." : "Asignar"}
+                  {assigningDriver ? "..." : currentChat?.assignedDriver ? "Reasignar" : "Asignar"}
                 </button>
               </div>
             </div>
@@ -818,10 +954,19 @@ export default function WhatsAppCrmPage() {
 
           {/* Tarjeta de Orden y Contexto */}
           <div className="bg-white dark:bg-[#12131A] p-4 rounded-2xl border border-gray-200/80 dark:border-stone-800 shadow-sm space-y-3">
-            <h3 className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
-              <Truck size={15} className="text-emerald-600 dark:text-emerald-400" />
-              Logística del Pedido
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
+                <Truck size={15} className="text-emerald-600 dark:text-emerald-400" />
+                Logística del Pedido
+              </h3>
+              <button
+                onClick={openEditDeliveryModal}
+                disabled={!currentChat}
+                className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1 cursor-pointer"
+              >
+                <Edit3 size={12} /> Modificar
+              </button>
+            </div>
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between py-1 border-b border-gray-100 dark:border-stone-800">
@@ -831,17 +976,60 @@ export default function WhatsAppCrmPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-gray-100 dark:border-stone-800">
-                <span className="text-gray-500 dark:text-stone-400">Canal:</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                  WhatsApp Business
+                <span className="text-gray-500 dark:text-stone-400 flex items-center gap-1">
+                  <Store size={12} /> Restaurante / Local:
+                </span>
+                <span className="font-bold text-gray-900 dark:text-white text-right truncate max-w-[140px]">
+                  {currentChat?.restaurantName || "No especificado"}
                 </span>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-gray-100 dark:border-stone-800">
-                <span className="text-gray-500 dark:text-stone-400">Sincronización:</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
-                  Tridireccional
+                <span className="text-gray-500 dark:text-stone-400 flex items-center gap-1">
+                  <MapPin size={12} /> Dirección Entrega:
+                </span>
+                <span className="font-medium text-gray-800 dark:text-stone-200 text-right truncate max-w-[140px]">
+                  {currentChat?.deliveryAddress || "Coordinar por chat"}
                 </span>
               </div>
+              <div className="flex items-center justify-between py-1 border-b border-gray-100 dark:border-stone-800">
+                <span className="text-gray-500 dark:text-stone-400 flex items-center gap-1">
+                  <DollarSign size={12} /> Monto / Cobro:
+                </span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  ${currentChat?.totalAmount !== undefined && currentChat?.totalAmount !== null ? currentChat.totalAmount : 0}
+                </span>
+              </div>
+              {currentChat?.notes && (
+                <div className="py-1 border-b border-gray-100 dark:border-stone-800">
+                  <span className="text-gray-500 dark:text-stone-400 block text-[10px] uppercase font-bold">Notas de Central:</span>
+                  <p className="text-gray-700 dark:text-stone-300 text-[11px] mt-0.5">{currentChat.notes}</p>
+                </div>
+              )}
+              {currentChat?.cancellationReason && (
+                <div className="p-2 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-[11px] text-red-800 dark:text-red-300">
+                  <strong>Motivo Cancelación:</strong> {currentChat.cancellationReason}
+                </div>
+              )}
+            </div>
+
+            {/* Botones de acción logística */}
+            <div className="space-y-1.5 pt-2 border-t border-gray-100 dark:border-stone-800">
+              <button
+                onClick={openEditDeliveryModal}
+                disabled={!currentChat}
+                className="w-full py-2 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-gray-800 dark:text-gray-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Edit3 size={13} /> Modificar Datos del Pedido
+              </button>
+
+              {currentChat && currentChat.status !== "cancelled" && (
+                <button
+                  onClick={() => setIsCancelModalOpen(true)}
+                  className="w-full py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/60 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Ban size={13} /> Cancelar Delivery
+                </button>
+              )}
             </div>
 
             <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-stone-900/60 border border-gray-100 dark:border-stone-800 text-[11px] text-gray-600 dark:text-stone-400 leading-relaxed">
@@ -1244,6 +1432,216 @@ export default function WhatsAppCrmPage() {
                   {simulating ? "Simulando..." : "Simular Mensaje Entrante 🚀"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 4: MODIFICAR DATOS DEL PEDIDO / DELIVERY */}
+      {/* ========================================================================= */}
+      {isEditDeliveryModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#12131A] rounded-2xl border border-gray-200 dark:border-stone-800 max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-stone-800 pb-3">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Edit3 size={18} className="text-emerald-600" />
+                Modificar Logística del Pedido
+              </h2>
+              <button
+                onClick={() => setIsEditDeliveryModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDeliveryDetails} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Nombre Cliente</label>
+                  <input
+                    type="text"
+                    value={deliveryForm.customerName}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, customerName: e.target.value })}
+                    placeholder="Ej. María Pérez"
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Orden Ref / Factura</label>
+                  <input
+                    type="text"
+                    value={deliveryForm.orderId}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, orderId: e.target.value })}
+                    placeholder="Ej. VNP-8492"
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Restaurante / Comercio (Punto de retiro)</label>
+                <input
+                  type="text"
+                  value={deliveryForm.restaurantName}
+                  onChange={(e) => setDeliveryForm({ ...deliveryForm, restaurantName: e.target.value })}
+                  placeholder="Ej. Burger House Centro"
+                  className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Dirección de Entrega (Destino)</label>
+                <textarea
+                  value={deliveryForm.deliveryAddress}
+                  onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryAddress: e.target.value })}
+                  rows={2}
+                  placeholder="Ej. Av. Principal, Res. El Parque, Piso 3, Apto 3B"
+                  className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Monto Total / Tarifa ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={deliveryForm.totalAmount}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, totalAmount: e.target.value })}
+                    placeholder="Ej. 12.50"
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Notas internas de despacho</label>
+                  <input
+                    type="text"
+                    value={deliveryForm.notes}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, notes: e.target.value })}
+                    placeholder="Ej. Cobrar punto de venta"
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40 text-[11px] text-blue-800 dark:text-blue-300">
+                ℹ️ Si hay un conductor asignado, recibirá una alerta automática en su WhatsApp con los datos actualizados.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditDeliveryModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 hover:bg-gray-200 dark:bg-stone-800 text-gray-700 dark:text-stone-300 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDeliveryDetails}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer"
+                >
+                  {savingDeliveryDetails ? "Guardando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: CANCELAR DELIVERY */}
+      {/* ========================================================================= */}
+      {isCancelModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#12131A] rounded-2xl border border-gray-200 dark:border-stone-800 max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-stone-800 pb-3">
+              <h2 className="text-base font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+                <Ban size={18} />
+                Cancelar Delivery
+              </h2>
+              <button
+                onClick={() => setIsCancelModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl text-xs text-red-800 dark:text-red-200 space-y-1">
+              <p className="font-bold">⚠️ Consecuencias de la cancelación:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-red-700 dark:text-red-300">
+                <li>El conductor asignado quedará libre inmediatamente.</li>
+                <li>Se registrará el evento en la auditoría del chat.</li>
+                <li>Se notificará al cliente y conductor vía WhatsApp.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Selecciona el Motivo:</label>
+                <div className="space-y-1.5 mt-1.5">
+                  {[
+                    "Cliente canceló el pedido",
+                    "Restaurante cerrado o sin existencias",
+                    "Sin conductores disponibles en la zona",
+                    "Dirección de entrega fuera de cobertura",
+                    "Pedido duplicado o de prueba",
+                    "Otro",
+                  ].map((reason) => (
+                    <label
+                      key={reason}
+                      className={`flex items-center gap-2.5 p-2 rounded-xl text-xs font-medium border cursor-pointer transition-colors ${
+                        cancelReason === reason
+                          ? "bg-red-50 dark:bg-red-950/40 border-red-500 text-red-900 dark:text-red-200"
+                          : "bg-gray-50 dark:bg-stone-900 border-gray-200 dark:border-stone-800 text-gray-700 dark:text-stone-300 hover:bg-gray-100"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="cancelReasonOption"
+                        checked={cancelReason === reason}
+                        onChange={() => setCancelReason(reason)}
+                        className="text-red-600 focus:ring-red-500"
+                      />
+                      <span>{reason}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {cancelReason === "Otro" && (
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Especifica el motivo:</label>
+                  <textarea
+                    value={customCancelReason}
+                    onChange={(e) => setCustomCancelReason(e.target.value)}
+                    rows={2}
+                    placeholder="Escribe el motivo detallado..."
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white mt-1"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-stone-800">
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 hover:bg-gray-200 dark:bg-stone-800 text-gray-700 dark:text-stone-300 cursor-pointer"
+              >
+                Regresar
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelDelivery}
+                disabled={cancellingDelivery || (cancelReason === "Otro" && !customCancelReason.trim())}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer"
+              >
+                {cancellingDelivery ? "Cancelando..." : "Confirmar Cancelación"}
+              </button>
             </div>
           </div>
         </div>

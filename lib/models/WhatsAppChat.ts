@@ -1,4 +1,4 @@
-﻿import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface IAssignedDriver {
   driverId: string;
@@ -15,7 +15,11 @@ export interface IWhatsAppChat extends Document {
   customerPhone: string;
   assignedDriver?: IAssignedDriver;
   orderId?: string;
-  status: "open" | "assigned" | "in_delivery" | "delivered" | "closed";
+  restaurantName?: string;
+  deliveryAddress?: string;
+  totalAmount?: number;
+  cancellationReason?: string;
+  status: "open" | "assigned" | "in_delivery" | "delivered" | "closed" | "cancelled";
   lastMessage: string;
   lastSender: "customer" | "driver" | "admin" | "system";
   lastMessageAt: Date;
@@ -46,9 +50,13 @@ const WhatsAppChatSchema: Schema = new Schema(
     customerPhone: { type: String, required: true, index: true },
     assignedDriver: { type: AssignedDriverSchema, default: null },
     orderId: { type: String, default: "" },
+    restaurantName: { type: String, default: "" },
+    deliveryAddress: { type: String, default: "" },
+    totalAmount: { type: Number, default: 0 },
+    cancellationReason: { type: String, default: "" },
     status: {
       type: String,
-      enum: ["open", "assigned", "in_delivery", "delivered", "closed"],
+      enum: ["open", "assigned", "in_delivery", "delivered", "closed", "cancelled"],
       default: "open",
       index: true,
     },
