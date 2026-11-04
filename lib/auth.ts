@@ -3,7 +3,7 @@ import NextAuth from "next-auth"
 import { MongoDBAdapter } from "@auth/mongodb-adapter"
 import { authConfig } from "./auth-config"
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/bonbonFlowers"
+const uri = process.env.MONGODB_URI || "mongodb+srv://gabo:1@cluster0.3frt9uu.mongodb.net/venpide?retryWrites=true&w=majority&appName=Cluster0"
 const options = {}
 
 let client

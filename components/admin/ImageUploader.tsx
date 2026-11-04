@@ -4,8 +4,8 @@ import React, { useState, useRef } from "react";
 import { IKContext, IKUpload } from "imagekitio-react";
 import { Upload, X, Star, Loader2, Plus, Link as LinkIcon, MoveLeft, MoveRight } from "lucide-react";
 
-const urlEndpoint = process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/4ub2sqhjx";
-const publicKey = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || "public_GgPCFA7xTepF28l1+/AnLhlwqec=";
+const urlEndpoint = process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/k00oav4la";
+const publicKey = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || "public_YuXO1v+TwY0jYouCF4REzzh/MD0=";
 
 const authenticator = async () => {
   try {

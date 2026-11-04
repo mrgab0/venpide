@@ -78,6 +78,7 @@ Thumbs.db
 *.rar
 .vercel
 .env*
+!.env.example
 
 # Facturas locales
 factura_bonbonflowers_*

@@ -47,7 +47,7 @@ function getSafeMapboxToken(): string {
   }
   try {
     const encoded =
-      "cGsuZXlKMUlqb2liWEpuWVdJd0lpd2lZU0k2SW1OdGRtVmpNVGt3TmpBd05tTXlkM0I1TkhKbWJYRjFaVGtpZlEuVGxfekE5ei1GdU9iTVZVNmJLVXlEUQ==";
+      "cGsuZXlKMUlqb2lkbVZ1Y0dsa1pUYzNJaXdpWVNJNkltTnRkekl6Wlc5NVlUQXhNbTB5ZUhFd09YQjZlWEZuZUc0aWZRLkZ1WGdVU2ZoSTItajQ5WC1ZYXFlWHc=";
     if (typeof window !== "undefined" && typeof window.atob === "function") {
       return window.atob(encoded);
     }

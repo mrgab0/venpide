@@ -5,9 +5,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const publicKey = process.env.IMAGEKIT_PUBLIC_KEY || process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || "public_GgPCFA7xTepF28l1+/AnLhlwqec=";
-    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY || "private_wGLJ5fQ/SxRV884E6sNoSaASzK0=";
-    const urlEndpoint = process.env.IMAGEKIT_URL_ENDPOINT || process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/4ub2sqhjx";
+    const publicKey = process.env.IMAGEKIT_PUBLIC_KEY || process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || "public_YuXO1v+TwY0jYouCF4REzzh/MD0=";
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY || "private_EXhNZb+juUSfPHm/ulwaSgX88xY=";
+    const urlEndpoint = process.env.IMAGEKIT_URL_ENDPOINT || process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/k00oav4la";
 
     const imagekit = new ImageKit({
       publicKey,

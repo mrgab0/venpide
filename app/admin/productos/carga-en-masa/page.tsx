@@ -37,7 +37,7 @@ import {
   RefreshCw
 } from "lucide-react";
 
-const publicKey = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || "public_GgPCFA7xTepF28l1+/AnLhlwqec=";
+const publicKey = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || "public_YuXO1v+TwY0jYouCF4REzzh/MD0=";
 
 const CATEGORIES = [
   "Rosas de Lujo",

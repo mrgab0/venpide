@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const DEFAULT_FALLBACK_URI = "mongodb+srv://gabo:1@cluster0.8uowp6d.mongodb.net/bonbonflower-db?retryWrites=true&w=majority&appName=Cluster0";
+const DEFAULT_FALLBACK_URI = "mongodb+srv://gabo:1@cluster0.3frt9uu.mongodb.net/venpide?retryWrites=true&w=majority&appName=Cluster0";
 const MONGODB_URI = process.env.MONGODB_URI || DEFAULT_FALLBACK_URI;
 
 /**
