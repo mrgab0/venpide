@@ -3,6 +3,9 @@
 import dbConnect from "@/lib/db";
 import { Order } from "@/lib/models/Order";
 import { EmailMessage } from "@/lib/models/EmailMessage";
+import { WhatsAppChat } from "@/lib/models/WhatsAppChat";
+import { WhatsAppMessage } from "@/lib/models/WhatsAppMessage";
+import { sendMetaWhatsAppMessage, normalizeWhatsAppNumber } from "@/lib/utils/metaWhatsApp";
 import { verify2FACodeAction } from "@/lib/actions/admin2fa";
 import {
   sendEmail,
@@ -10,6 +13,7 @@ import {
   wrapInBonbonEmailTemplate,
 } from "@/lib/email";
 import { markCartAsRecoveredAction } from "@/lib/actions/abandonedCart";
+import { revalidatePath } from "next/cache";
 
 export async function createOrder(orderData: any, existingOrderId?: string) {
   await dbConnect();
@@ -56,7 +60,7 @@ export async function createOrder(orderData: any, existingOrderId?: string) {
   if (!savedOrder) {
     savedOrder = new Order({
       ...orderData,
-      orderId: `BNBNFH-${String(Math.floor(10000 + Math.random() * 90000))}-1`,
+      orderId: `VNP-${String(Math.floor(10000 + Math.random() * 90000))}-1`,
       items: orderData.items,
       total: orderData.total,
       createdAt: new Date(),
@@ -105,15 +109,15 @@ export async function createOrder(orderData: any, existingOrderId?: string) {
         : "https://wa.me/13467392730";
 
       const receiptBodyHtml = `
-        <h2 style="color: #163422; font-family: Georgia, serif; font-size: 20px; margin-top: 0;">¡Comprobante de Pedido / Receipt! 🌸</h2>
+        <h2 style="color: #059669; font-size: 20px; margin-top: 0;">¡Comprobante de Pedido / Delivery! 🛵</h2>
 
         ${
           isConsolidatedWithin2Hours && originalOrder
             ? `
-          <div style="margin-bottom: 20px; padding: 14px; background-color: #F0FDF4; border-left: 4px solid #163422; border-radius: 8px;">
-            <strong style="color: #163422; font-size: 13px;">📦 Nota de Envío Agrupado / Consolidado (< 2 horas):</strong><br>
+          <div style="margin-bottom: 20px; padding: 14px; background-color: #ECFDF5; border-left: 4px solid #059669; border-radius: 8px;">
+            <strong style="color: #065F46; font-size: 13px;">📦 Nota de Envío Agrupado / Consolidado (< 2 horas):</strong><br>
             <span style="font-size: 12px; color: #1F2937; display: block; margin-top: 4px;">
-              Esta compra fue realizada <strong>${minutesElapsed} min</strong> después de tu pedido previo (<strong>#${originalOrder.orderId}</strong>). Como tu primer pedido aún está en diseño en boutique, nuestros repartidores agruparán ambos paquetes en la misma ruta de entrega a tu ubicación.
+              Esta compra fue realizada <strong>${minutesElapsed} min</strong> después de tu pedido previo (<strong>#${originalOrder.orderId}</strong>). Como tu primer pedido aún está en preparación en el local, nuestros motorizados agruparán ambos paquetes en la misma ruta de entrega.
             </span>
           </div>
         `
@@ -121,19 +125,19 @@ export async function createOrder(orderData: any, existingOrderId?: string) {
         }
 
         <div style="background-color: #F8FAF9; padding: 16px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #E5E7EB;">
-          <p style="margin: 4px 0;"><strong>ID Pedido:</strong> <span style="font-family: monospace; color: #163422; font-weight: bold;">${savedOrder.orderId}</span></p>
+          <p style="margin: 4px 0;"><strong>ID Pedido:</strong> <span style="font-family: monospace; color: #059669; font-weight: bold;">${savedOrder.orderId}</span></p>
           <p style="margin: 4px 0;"><strong>Cliente:</strong> ${savedOrder.customerName}</p>
           <p style="margin: 4px 0;"><strong>Correo Electrónico:</strong> ${savedOrder.customerEmail || "No especificado"}</p>
           <p style="margin: 4px 0;"><strong>Teléfono / WhatsApp:</strong> ${savedOrder.customerPhone}</p>
           <p style="margin: 4px 0;"><strong>Opción de Entrega:</strong> ${savedOrder.deliveryMethod || orderData.deliveryMethod || "Envío a Domicilio"}</p>
           <p style="margin: 4px 0;"><strong>Dirección de Entrega:</strong> ${savedOrder.address}</p>
-          ${savedOrder.distanceMiles ? `<p style="margin: 4px 0; color: #163422; font-weight: bold;"><strong>📍 Distancia desde Boutique:</strong> ${savedOrder.distanceMiles} Millas</p>` : ""}
+          ${savedOrder.distanceMiles ? `<p style="margin: 4px 0; color: #059669; font-weight: bold;"><strong>📍 Distancia de Entrega:</strong> ${savedOrder.distanceMiles} Millas</p>` : ""}
 
           ${
             savedOrder.cardMessage
               ? `
-            <div style="margin-top: 12px; padding: 12px; background-color: #FFFBEB; border-left: 4px solid #D4AF37; border-radius: 6px;">
-              <strong style="color: #92400E; font-size: 12px;">💌 Tarjeta de Dedicatoria Impresa Incluida:</strong><br>
+            <div style="margin-top: 12px; padding: 12px; background-color: #F0FDF4; border-left: 4px solid #10B981; border-radius: 6px;">
+              <strong style="color: #065F46; font-size: 12px;">📝 Notas / Instrucciones de Entrega:</strong><br>
               <em style="color: #1F2937; font-size: 13px; display: block; margin-top: 4px;">"${savedOrder.cardMessage}"</em>
             </div>
           `
@@ -232,7 +236,7 @@ export async function createOrder(orderData: any, existingOrderId?: string) {
         </div>
       `;
 
-      const subject = `🌸 Confirmación de Pedido: #${savedOrder.orderId} • Bonbon Flowers Houston`;
+      const subject = `🛵 Confirmación de Pedido: #${savedOrder.orderId} • Venpide Delivery`;
 
       const wrappedHtml = wrapInBonbonEmailTemplate({
         title: subject,
@@ -283,6 +287,76 @@ export async function createOrder(orderData: any, existingOrderId?: string) {
     } catch (cartErr) {
       console.error("Error marcando carrito como recuperado:", cartErr);
     }
+  }
+
+  // 3. Sincronización Automática con WhatsApp CRM & Notificación al Cliente
+  try {
+    if (savedOrder.customerPhone && savedOrder.customerPhone.trim()) {
+      const normalizedPhone = normalizeWhatsAppNumber(savedOrder.customerPhone);
+
+      const itemsSummary = (savedOrder.items || [])
+        .map((it: any) => `${it.quantity}x ${it.title || it.name}`)
+        .join(", ");
+
+      const welcomeWaText = `🛵 ¡Hola ${savedOrder.customerName}! Tu pedido #${savedOrder.orderId} en Venpide ha sido confirmado.
+
+📦 Productos: ${itemsSummary || "Artículos de entrega"}
+💰 Total: $${Number(savedOrder.total || 0).toFixed(2)}
+📍 Entrega: ${savedOrder.address || "Por coordinar"}
+
+Estamos asignando a un conductor motorizado de nuestra flota para tu entrega. Cualquier instrucción adicional para el repartidor puedes responderla directamente por este chat de WhatsApp.`;
+
+      // Buscar o crear conversación en CRM
+      let chat = await WhatsAppChat.findOne({ chatId: normalizedPhone });
+      if (!chat) {
+        chat = new WhatsAppChat({
+          chatId: normalizedPhone,
+          customerName: savedOrder.customerName || "Cliente Venpide",
+          customerPhone: normalizedPhone,
+          orderId: savedOrder.orderId,
+          restaurantName: savedOrder.restaurantName || "Venpide Comercios",
+          deliveryAddress: savedOrder.address || "",
+          totalAmount: savedOrder.total || 0,
+          status: "open",
+          lastMessage: `🛵 Nuevo pedido #${savedOrder.orderId}`,
+          lastSender: "system",
+          lastMessageAt: new Date(),
+          unreadAdminCount: 1,
+        });
+      } else {
+        chat.orderId = savedOrder.orderId;
+        chat.customerName = savedOrder.customerName || chat.customerName;
+        chat.deliveryAddress = savedOrder.address || chat.deliveryAddress;
+        chat.totalAmount = savedOrder.total || chat.totalAmount;
+        chat.status = "open";
+        chat.lastMessage = `🛵 Nuevo pedido #${savedOrder.orderId}`;
+        chat.lastSender = "system";
+        chat.lastMessageAt = new Date();
+        chat.unreadAdminCount = (chat.unreadAdminCount || 0) + 1;
+      }
+      await chat.save();
+
+      // Guardar mensaje en el historial del chat
+      await WhatsAppMessage.create({
+        chatId: normalizedPhone,
+        senderType: "system",
+        senderName: "Sistema Venpide",
+        text: welcomeWaText,
+        status: "delivered",
+        createdAt: new Date(),
+      });
+
+      // Disparar envío por Meta WhatsApp Cloud API (o simulación interna si no hay credenciales Meta)
+      await sendMetaWhatsAppMessage({
+        to: normalizedPhone,
+        text: welcomeWaText,
+      });
+
+      revalidatePath("/admin/whatsapp");
+      console.log(`[WhatsApp CRM] Orden ${savedOrder.orderId} sincronizada con el CRM y cliente notificado.`);
+    }
+  } catch (crmErr) {
+    console.error("Error sincronizando orden con WhatsApp CRM:", crmErr);
   }
 
   return { success: true, orderId: savedOrder.orderId };

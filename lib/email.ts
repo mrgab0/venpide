@@ -42,11 +42,11 @@ export interface WrapTemplateOptions {
  * Prioridad: Base de Datos (SiteConfig) > Variables de Entorno > Defaults de Marca
  */
 export async function getCorporateEmailConfig(): Promise<CorporateEmailConfig> {
-  let senderEmail = "orders@bonbonflowerhouston.com";
-  let senderName = "Bonbon Flowers Houston";
-  let replyTo = "contact@bonbonflowerhouston.com";
+  let senderEmail = "pedidos@venpide.com";
+  let senderName = "Venpide Delivery";
+  let replyTo = "soporte@venpide.com";
   let resendApiKey = process.env.RESEND_API_KEY || "";
-  let adminEmails: string[] = ["orders@bonbonflowerhouston.com", "iirockalonso@gmail.com"];
+  let adminEmails: string[] = ["pedidos@venpide.com", "iirockalonso@gmail.com"];
 
   // Si SMTP_FROM o RESEND_FROM están definidos en variables de entorno, tomarlos
   const envFrom = process.env.RESEND_FROM || process.env.SMTP_FROM || "";
@@ -96,24 +96,23 @@ export async function getCorporateEmailConfig(): Promise<CorporateEmailConfig> {
 }
 
 /**
- * Plantilla visual oficial de alta costura para Bonbon Flowers Houston
- * Diseñada con colores de marca: Verde bosque #163422, Dorado #C5A059, Tipografía Serif
+ * Plantilla visual oficial de correos para Venpide Delivery
+ * Diseñada con colores de marca: Esmeralda #059669, Fondo #12131A, Tipografía moderna
  */
 export function wrapInBonbonEmailTemplate({
-  title = "Bonbon Flowers",
-  preheader = "Art Floral • Houston, Texas",
+  title = "Venpide Delivery",
+  preheader = "Tu pedido en camino • Delivery Rápido",
   bodyHtml,
   ctaText,
   ctaUrl,
   showContactFooter = true,
 }: WrapTemplateOptions): string {
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://bonbonflowerhouston.com").replace(/\/$/, "");
-  const logoUrl = `${siteUrl}/logo.png`;
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://venpide-gabriel-cavaneris-projects.vercel.app").replace(/\/$/, "");
 
   const ctaButtonHtml = ctaText && ctaUrl
     ? `
       <div style="margin: 28px 0 20px 0; text-align: center;">
-        <a href="${ctaUrl}" target="_blank" style="background-color: #163422; color: #FFFFFF; text-decoration: none; padding: 14px 32px; border-radius: 9999px; font-weight: bold; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; display: inline-block; border: 1px solid #C5A059; box-shadow: 0 4px 14px rgba(22, 52, 34, 0.25);">
+        <a href="${ctaUrl}" target="_blank" style="background-color: #059669; color: #FFFFFF; text-decoration: none; padding: 14px 32px; border-radius: 9999px; font-weight: bold; font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; display: inline-block; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);">
           ${ctaText} →
         </a>
       </div>
@@ -142,20 +141,17 @@ export function wrapInBonbonEmailTemplate({
       </div>
 
       <table role="presentation" class="email-container" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 18px; overflow: hidden; border: 1px solid #EAEAEA;">
-        <!-- Cabecera de Lujo Verde Bosque & Oro -->
+        <!-- Cabecera Venpide Esmeralda & Dark -->
         <tr>
-          <td style="background: linear-gradient(135deg, #163422 0%, #1B2E22 100%); padding: 26px 30px; text-align: center; border-bottom: 2px solid #C5A059;">
+          <td style="background: linear-gradient(135deg, #059669 0%, #064E3B 100%); padding: 26px 30px; text-align: center; border-bottom: 2px solid #10B981;">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
               <tr>
                 <td style="text-align: center;">
-                  <a href="${siteUrl}" target="_blank" style="text-decoration: none; display: inline-block;">
-                    <img src="${logoUrl}" alt="Bonbon Flowers Logo" width="56" height="56" style="width: 56px; height: 56px; border-radius: 50%; border: 2px solid #D4AF37; display: block; margin: 0 auto 10px auto; object-fit: cover;" />
-                  </a>
-                  <h1 style="color: #FFFFFF; margin: 0; font-family: Georgia, 'Playfair Display', serif; font-size: 23px; font-weight: 800; letter-spacing: 0.05em;">
-                    Bonbon Flowers
+                  <h1 style="color: #FFFFFF; margin: 0; font-size: 26px; font-weight: 900; letter-spacing: -0.02em;">
+                    🛵 Venpide
                   </h1>
-                  <p style="color: #E6C98B; margin: 4px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.22em; font-weight: bold;">
-                    Art Floral • Houston
+                  <p style="color: #A7F3D0; margin: 4px 0 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; font-weight: bold;">
+                    Delivery & Logística Express
                   </p>
                 </td>
               </tr>
@@ -176,15 +172,15 @@ export function wrapInBonbonEmailTemplate({
           showContactFooter
             ? `
           <tr>
-            <td style="background-color: #0F1210; color: #E6F7F0; padding: 24px 30px; text-align: center; font-size: 11px; border-top: 1px solid rgba(197, 160, 89, 0.2);">
-              <p style="margin: 0 0 8px 0; font-weight: bold; color: #D4AF37; letter-spacing: 0.08em; text-transform: uppercase;">
-                Bonbon Flowers • Houston, Texas
+            <td style="background-color: #12131A; color: #E6F7F0; padding: 24px 30px; text-align: center; font-size: 11px; border-top: 1px solid rgba(16, 185, 129, 0.2);">
+              <p style="margin: 0 0 8px 0; font-weight: bold; color: #34D399; letter-spacing: 0.08em; text-transform: uppercase;">
+                Venpide • Tu Ciudad al Instante
               </p>
-              <p style="margin: 0 0 10px 0; color: #A3B8AD; line-height: 1.4;">
-                Atención Boutique: <strong>(346) 739-2730</strong> • Same-Day Delivery Metroplex
+              <p style="margin: 0 0 10px 0; color: #94A3B8; line-height: 1.4;">
+                Central de Envíos & Despacho de Moto Taxi
               </p>
               <p style="margin: 0; color: #64748B; font-size: 10px;">
-                © ${new Date().getFullYear()} Bonbon Flowers Houston. Todos los derechos reservados.
+                © ${new Date().getFullYear()} Venpide. Todos los derechos reservados.
               </p>
             </td>
           </tr>
