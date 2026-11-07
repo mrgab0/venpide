@@ -13,6 +13,19 @@ export interface IWhatsAppChat extends Document {
   chatId: string; // Standardized customer phone e.g. "584121234567"
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
+  serviceType?: "delivery" | "traslado" | "mandaito" | "flete" | "";
+  paymentMethod?: "pago_movil" | "efectivo" | "zelle" | "binance" | "";
+  paymentStatus?: "unpaid" | "pending_verification" | "paid" | "failed";
+  paymentRef?: string;
+  conversationStep?:
+    | "greeting"
+    | "awaiting_service"
+    | "awaiting_details"
+    | "awaiting_payment_method"
+    | "awaiting_payment_proof"
+    | "dispatching"
+    | "completed";
   assignedDriver?: IAssignedDriver;
   orderId?: string;
   restaurantId?: string;
@@ -63,6 +76,37 @@ const WhatsAppChatSchema: Schema = new Schema(
     chatId: { type: String, required: true, unique: true, index: true },
     customerName: { type: String, default: "Cliente Venpide" },
     customerPhone: { type: String, required: true, index: true },
+    customerEmail: { type: String, default: "" },
+    serviceType: {
+      type: String,
+      enum: ["delivery", "traslado", "mandaito", "flete", ""],
+      default: "",
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["pago_movil", "efectivo", "zelle", "binance", ""],
+      default: "",
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "pending_verification", "paid", "failed"],
+      default: "unpaid",
+      index: true,
+    },
+    paymentRef: { type: String, default: "" },
+    conversationStep: {
+      type: String,
+      enum: [
+        "greeting",
+        "awaiting_service",
+        "awaiting_details",
+        "awaiting_payment_method",
+        "awaiting_payment_proof",
+        "dispatching",
+        "completed",
+      ],
+      default: "greeting",
+    },
     assignedDriver: { type: AssignedDriverSchema, default: null },
     orderId: { type: String, default: "" },
     restaurantId: { type: String, default: "" },

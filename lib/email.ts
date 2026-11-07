@@ -351,3 +351,157 @@ export async function sendBatchEmails(
     return { success: false, sentCount: 0, errors: [err.message] };
   }
 }
+
+/**
+ * Factura Digital y Recibo de Pago Móvil Verificado
+ * Envía recibo formal al cliente y copia de auditoría a la administración (iirockalonso@gmail.com)
+ */
+export interface PagoMovilReceiptOptions {
+  orderId: string;
+  reference: string;
+  bankName?: string;
+  amountBs: number;
+  amountUsd: number;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  serviceType?: string;
+  itemsSummary?: string;
+  deliveryAddress?: string;
+  driverName?: string;
+  driverPhone?: string;
+}
+
+export async function sendPagoMovilReceiptEmail(
+  options: PagoMovilReceiptOptions
+): Promise<{ success: boolean; clientSent: boolean; adminSent: boolean; error?: string }> {
+  try {
+    const config = await getCorporateEmailConfig();
+
+    const formattedDate = new Date().toLocaleString("es-VE", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    const bodyHtml = `
+      <div style="padding: 10px 0;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <span style="background-color: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 11px; font-weight: 800; padding: 6px 16px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block;">
+            ✓ Pago Móvil Verificado y Conciliado
+          </span>
+          <h2 style="color: #111827; font-size: 22px; font-weight: 800; margin: 16px 0 6px 0;">
+            Comprobante de Pago & Factura
+          </h2>
+          <p style="color: #6B7280; font-size: 13px; margin: 0;">
+            Orden Ref: <strong style="color: #059669; font-family: monospace;">#${options.orderId}</strong> • ${formattedDate}
+          </p>
+        </div>
+
+        <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 14px; padding: 18px; margin-bottom: 20px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <tr>
+              <td style="color: #6B7280; padding: 6px 0;">Referencia Bancaria:</td>
+              <td style="color: #111827; font-weight: bold; text-align: right; font-family: monospace; font-size: 14px;">
+                ${options.reference}
+              </td>
+            </tr>
+            <tr>
+              <td style="color: #6B7280; padding: 6px 0;">Banco:</td>
+              <td style="color: #111827; font-weight: 600; text-align: right;">
+                ${options.bankName || "Pago Móvil Interbancario"}
+              </td>
+            </tr>
+            <tr>
+              <td style="color: #6B7280; padding: 6px 0;">Monto en Bolívares:</td>
+              <td style="color: #059669; font-weight: 800; text-align: right; font-size: 15px;">
+                Bs. ${Number(options.amountBs || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+              </td>
+            </tr>
+            <tr>
+              <td style="color: #6B7280; padding: 6px 0;">Equivalente en USD:</td>
+              <td style="color: #374151; font-weight: bold; text-align: right;">
+                $${Number(options.amountUsd || 0).toFixed(2)} USD
+              </td>
+            </tr>
+            <tr style="border-top: 1px dashed #D1D5DB;">
+              <td style="color: #6B7280; padding: 10px 0 6px 0;">Servicio:</td>
+              <td style="color: #111827; font-weight: bold; text-align: right; text-transform: capitalize; padding-top: 10px;">
+                ${options.serviceType || "Delivery"}
+              </td>
+            </tr>
+            <tr>
+              <td style="color: #6B7280; padding: 6px 0;">Cliente:</td>
+              <td style="color: #111827; text-align: right;">
+                ${options.customerName} (+${options.customerPhone})
+              </td>
+            </tr>
+            <tr>
+              <td style="color: #6B7280; padding: 6px 0;">Dirección:</td>
+              <td style="color: #111827; text-align: right;">
+                ${options.deliveryAddress || "Coordinada vía WhatsApp"}
+              </td>
+            </tr>
+            <tr>
+              <td style="color: #6B7280; padding: 6px 0;">Motorizado Asignado:</td>
+              <td style="color: #2563EB; font-weight: bold; text-align: right;">
+                🛵 ${options.driverName || "En cola de asignación"}
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        ${
+          options.itemsSummary
+            ? `
+          <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px; margin-bottom: 20px;">
+            <div style="font-size: 11px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; margin-bottom: 6px;">Detalle del Pedido:</div>
+            <p style="color: #374151; font-size: 13px; margin: 0; line-height: 1.5;">${options.itemsSummary}</p>
+          </div>
+        `
+            : ""
+        }
+
+        <div style="text-align: center; font-size: 12px; color: #6B7280; line-height: 1.5; padding: 10px 0;">
+          Gracias por confiar en <strong>Venpide Delivery</strong>. Si tienes alguna duda sobre tu transacción, contáctanos directamente a nuestro WhatsApp oficial.
+        </div>
+      </div>
+    `;
+
+    const htmlContent = wrapInBonbonEmailTemplate({
+      title: `Recibo de Pago Móvil #${options.orderId} - Venpide`,
+      preheader: `Pago confirmado Ref: ${options.reference} - Bs. ${options.amountBs}`,
+      bodyHtml,
+      ctaText: "Ver Estado en WhatsApp",
+      ctaUrl: "https://wa.me/584121234567",
+    });
+
+    let clientSent = false;
+    let adminSent = false;
+
+    // 1. Enviar email al cliente si tiene correo disponible
+    if (options.customerEmail && options.customerEmail.includes("@")) {
+      const clientRes = await sendCorporateEmail({
+        to: options.customerEmail,
+        subject: `✅ Factura de Pago Confirmado #${options.orderId} - Venpide Delivery`,
+        html: htmlContent,
+      });
+      clientSent = clientRes.success;
+    }
+
+    // 2. Enviar copia de auditoría a los administradores / jefe
+    const adminRecipients = config.adminEmails.filter(Boolean);
+    if (adminRecipients.length > 0) {
+      const adminRes = await sendCorporateEmail({
+        to: adminRecipients,
+        subject: `🔔 [Auditoría Cobranza] Pago Móvil Verificado: #${options.orderId} (Ref: ${options.reference})`,
+        html: htmlContent,
+      });
+      adminSent = adminRes.success;
+    }
+
+    return { success: true, clientSent, adminSent };
+  } catch (err: any) {
+    console.error("[sendPagoMovilReceiptEmail Error]", err);
+    return { success: false, clientSent: false, adminSent: false, error: err.message };
+  }
+}

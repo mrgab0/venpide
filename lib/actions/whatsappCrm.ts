@@ -732,3 +732,46 @@ export async function simulateIncomingWhatsAppMessageAction(payload: {
     return { success: false, error: error.message };
   }
 }
+
+// =========================================================================
+// 8. AUDITORÍA Y CONCILIACIÓN DE PAGO MÓVIL
+// =========================================================================
+
+export async function getPagoMovilReferencesAction(limit: number = 50) {
+  await dbConnect();
+  try {
+    const { PagoMovilReference } = await import("@/lib/models/PagoMovilReference");
+    const refs = await PagoMovilReference.find().sort({ createdAt: -1 }).limit(limit).lean();
+    return { success: true, references: JSON.parse(JSON.stringify(refs)) };
+  } catch (error: any) {
+    console.error("Error al obtener referencias de pago:", error);
+    return { success: false, error: error.message, references: [] };
+  }
+}
+
+export async function manualVerifyPagoMovilAction(
+  chatId: string,
+  reference: string,
+  amountBs: number
+) {
+  await dbConnect();
+  try {
+    const { processIncomingPaymentProof } = await import("@/lib/ai/pagoMovilVerifier");
+    const chat = await WhatsAppChat.findOne({ chatId });
+    if (!chat) return { success: false, error: "Chat no encontrado" };
+
+    const result = await processIncomingPaymentProof({
+      chatId,
+      customerPhone: chat.customerPhone,
+      customerName: chat.customerName,
+      customerEmail: chat.customerEmail,
+      text: `Pago Móvil Ref: ${reference.trim()} Monto: Bs. ${amountBs || 0}`,
+    });
+
+    revalidatePath("/admin/whatsapp");
+    return { success: result.verified, message: result.message };
+  } catch (error: any) {
+    console.error("Error al verificar pago manualmente:", error);
+    return { success: false, error: error.message };
+  }
+}

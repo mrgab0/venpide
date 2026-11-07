@@ -31,6 +31,9 @@ import {
   DollarSign,
   Ban,
   UserMinus,
+  CreditCard,
+  CheckCircle,
+  AlertTriangle,
 } from "lucide-react";
 import {
   getWhatsAppChatsAction,
@@ -49,6 +52,8 @@ import {
   simulateIncomingWhatsAppMessageAction,
   triggerRestaurantAlertAction,
   triggerDriverBroadcastAction,
+  getPagoMovilReferencesAction,
+  manualVerifyPagoMovilAction,
 } from "@/lib/actions/whatsappCrm";
 import {
   getRestaurantsAction,
@@ -84,6 +89,13 @@ export default function WhatsAppCrmPage() {
   const [seedingRestaurants, setSeedingRestaurants] = useState(false);
   const [triggeringRestaurant, setTriggeringRestaurant] = useState(false);
   const [broadcastingDrivers, setBroadcastingDrivers] = useState(false);
+
+  // Estado de Pago Móvil y Auditoría Anti-Fraude
+  const [pagoMovilRefs, setPagoMovilRefs] = useState<any[]>([]);
+  const [isPagoMovilModalOpen, setIsPagoMovilModalOpen] = useState(false);
+  const [manualRefInput, setManualRefInput] = useState("");
+  const [manualAmountInput, setManualAmountInput] = useState("");
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
 
   // Modales
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
@@ -171,11 +183,19 @@ export default function WhatsAppCrmPage() {
     }
   };
 
+  const fetchPagoMovilRefs = async () => {
+    const res = await getPagoMovilReferencesAction();
+    if (res.success && res.references) {
+      setPagoMovilRefs(res.references);
+    }
+  };
+
   useEffect(() => {
     fetchChats();
     fetchDrivers();
     fetchMetaConfig();
     fetchRestaurants();
+    fetchPagoMovilRefs();
   }, [filterStatus]);
 
   useEffect(() => {
@@ -432,6 +452,32 @@ export default function WhatsAppCrmPage() {
     }
   };
 
+  const handleManualVerifyPagoMovil = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeChatId || !manualRefInput.trim() || verifyingPayment) return;
+    setVerifyingPayment(true);
+    const res = await manualVerifyPagoMovilAction(
+      activeChatId,
+      manualRefInput.trim(),
+      manualAmountInput ? Number(manualAmountInput) : 0
+    );
+    setVerifyingPayment(false);
+    if (res.success) {
+      alert("✅ Pago Móvil verificado con éxito. Se actualizó el pedido, se alertó al motorizado y se enviaron los correos.");
+      setManualRefInput("");
+      setManualAmountInput("");
+      fetchChats();
+      fetchPagoMovilRefs();
+      getWhatsAppMessagesAction(activeChatId).then((m) => {
+        if (m.success && m.messages) setMessages(m.messages);
+        scrollToBottom();
+      });
+    } else {
+      alert("⚠️ Error en verificación de Pago Móvil: " + (res.message || res.error));
+      fetchPagoMovilRefs();
+    }
+  };
+
   // =========================================================================
   // GESTIÓN DE CONDUCTORES
   // =========================================================================
@@ -597,6 +643,18 @@ export default function WhatsAppCrmPage() {
             <span>Simulador de Pruebas</span>
           </button>
 
+          {/* Botón Auditoría Pago Móvil */}
+          <button
+            onClick={() => {
+              fetchPagoMovilRefs();
+              setIsPagoMovilModalOpen(true);
+            }}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <CreditCard size={15} className="text-blue-600 dark:text-blue-400" />
+            <span>Auditoría Pagos ({pagoMovilRefs.length})</span>
+          </button>
+
           {/* Botón Configuración Meta */}
           <button
             onClick={() => setIsConfigModalOpen(true)}
@@ -612,6 +670,7 @@ export default function WhatsAppCrmPage() {
               fetchChats();
               fetchDrivers();
               fetchRestaurants();
+              fetchPagoMovilRefs();
             }}
             className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-stone-800 text-gray-600 dark:text-stone-300 transition-colors"
             title="Recargar conversaciones"
@@ -1183,6 +1242,81 @@ export default function WhatsAppCrmPage() {
                   ${currentChat?.totalAmount !== undefined && currentChat?.totalAmount !== null ? currentChat.totalAmount : 0}
                 </span>
               </div>
+
+              {/* Estado del Pago & Referencia */}
+              <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-stone-900 border border-gray-100 dark:border-stone-800 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500 dark:text-stone-400 flex items-center gap-1">
+                    <CreditCard size={12} className="text-blue-600" /> Estado de Pago:
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      currentChat?.paymentStatus === "paid"
+                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                        : currentChat?.paymentStatus === "pending_verification"
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                        : "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300"
+                    }`}
+                  >
+                    {currentChat?.paymentStatus === "paid" && "🟢 PAGADO"}
+                    {currentChat?.paymentStatus === "pending_verification" && "🟡 POR VERIFICAR"}
+                    {(!currentChat?.paymentStatus || currentChat?.paymentStatus === "unpaid") && "🔴 NO PAGADO"}
+                  </span>
+                </div>
+                {currentChat?.paymentRef && (
+                  <div className="text-[11px] font-mono text-gray-700 dark:text-stone-300 flex items-center justify-between">
+                    <span className="text-gray-400">Ref Bancaria:</span>
+                    <strong className="text-blue-600 dark:text-blue-400">#{currentChat.paymentRef}</strong>
+                  </div>
+                )}
+                {currentChat?.serviceType && (
+                  <div className="text-[11px] text-gray-700 dark:text-stone-300 flex items-center justify-between">
+                    <span className="text-gray-400">Módulo Servicio:</span>
+                    <strong className="capitalize text-emerald-700 dark:text-emerald-400">
+                      {currentChat.serviceType === "delivery" && "🍔 Delivery"}
+                      {currentChat.serviceType === "traslado" && "🏍️ Traslado"}
+                      {currentChat.serviceType === "mandaito" && "📦 Mandaito"}
+                      {currentChat.serviceType === "flete" && "🚚 Flete"}
+                    </strong>
+                  </div>
+                )}
+              </div>
+
+              {/* Conciliación Rápida de Pago Móvil */}
+              {currentChat && currentChat.paymentStatus !== "paid" && (
+                <form
+                  onSubmit={handleManualVerifyPagoMovil}
+                  className="p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 space-y-2"
+                >
+                  <label className="text-[10px] font-bold text-blue-900 dark:text-blue-200 block uppercase">
+                    ⚡ Conciliar Pago Móvil:
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <input
+                      type="text"
+                      value={manualRefInput}
+                      onChange={(e) => setManualRefInput(e.target.value)}
+                      placeholder="N° Referencia"
+                      className="w-full text-xs p-1.5 rounded-lg border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white font-mono"
+                    />
+                    <input
+                      type="number"
+                      value={manualAmountInput}
+                      onChange={(e) => setManualAmountInput(e.target.value)}
+                      placeholder="Monto en Bs."
+                      className="w-full text-xs p-1.5 rounded-lg border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!manualRefInput.trim() || verifyingPayment}
+                    className="w-full py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-[11px] transition-colors cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <CheckCircle size={12} />
+                    {verifyingPayment ? "Conciliando..." : "Verificar y Confirmar Pago"}
+                  </button>
+                </form>
+              )}
               {currentChat?.notes && (
                 <div className="py-1 border-b border-gray-100 dark:border-stone-800">
                   <span className="text-gray-500 dark:text-stone-400 block text-[10px] uppercase font-bold">Notas de Central:</span>
@@ -2089,6 +2223,124 @@ export default function WhatsAppCrmPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+      {/* MODAL 7: AUDITORÍA DE REFERENCIAS DE PAGO MÓVIL & ANTI-FRAUDE */}
+      {/* ========================================================================= */}
+      {isPagoMovilModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#12131A] rounded-2xl border border-gray-200 dark:border-stone-800 max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-stone-800 pb-3">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <CreditCard size={18} className="text-blue-600" />
+                Auditoría de Pagos Móviles & Conciliación Anti-Fraude
+              </h2>
+              <button
+                onClick={() => setIsPagoMovilModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900/40 text-xs text-blue-900 dark:text-blue-200 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-bold">🛡️ Conciliador Discriminatorio Activo (Ventana de 7 Días):</p>
+                <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                  Cualquier número de referencia bancaria reutilizado en un plazo de 7 días es bloqueado de inmediato para proteger la caja de Venpide.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchPagoMovilRefs}
+                className="shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition-colors cursor-pointer"
+              >
+                🔄 Actualizar
+              </button>
+            </div>
+
+            {/* Listado de Referencias Registradas */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-gray-500 uppercase">
+                Historial de Comprobantes ({pagoMovilRefs.length})
+              </h4>
+              {pagoMovilRefs.length === 0 ? (
+                <div className="p-8 text-center text-xs text-gray-400 bg-gray-50 dark:bg-stone-900 rounded-xl">
+                  No hay comprobantes de pago móvil registrados en el historial aún.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 dark:divide-stone-800 border border-gray-100 dark:border-stone-800 rounded-xl overflow-hidden text-xs">
+                  {pagoMovilRefs.map((refItem) => (
+                    <div
+                      key={refItem._id}
+                      className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-stone-900"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-sm text-gray-900 dark:text-white">
+                            #{refItem.reference}
+                          </span>
+                          <span
+                            className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                              refItem.status === "verified"
+                                ? "bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300"
+                                : refItem.status === "duplicate"
+                                ? "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300"
+                                : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                            }`}
+                          >
+                            {refItem.status === "verified" && "✓ Verificado"}
+                            {refItem.status === "duplicate" && "⚠️ Duplicado (Bloqueado)"}
+                            {refItem.status === "rejected" && "❌ Rechazado"}
+                            {refItem.status === "pending_bank" && "🟡 Pendiente"}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            {refItem.bankName || "Pago Móvil"}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-gray-500 dark:text-stone-400">
+                          Cliente: <strong>{refItem.customerName || "Cliente"}</strong> (+{refItem.customerPhone}) • Orden:{" "}
+                          <span className="font-mono">{refItem.orderId || "VNP-DIRECTO"}</span> • Vía:{" "}
+                          <span className="font-semibold uppercase">{refItem.verificationSource || "Texto"}</span>
+                        </div>
+                        {refItem.rejectionReason && (
+                          <div className="text-[10px] text-red-600 dark:text-red-400 font-semibold">
+                            Motivo: {refItem.rejectionReason}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                          Bs. {Number(refItem.amountBs || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-[10px] text-gray-400">
+                          ${Number(refItem.amountUsd || 0).toFixed(2)} USD •{" "}
+                          {new Date(refItem.createdAt).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setIsPagoMovilModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 hover:bg-gray-200 dark:bg-stone-800 text-gray-700 dark:text-stone-300 cursor-pointer"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>

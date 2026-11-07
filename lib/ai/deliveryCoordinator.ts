@@ -474,3 +474,256 @@ export async function handleCustomerConfirmation(customerPhone: string, text: st
     return { success: false, error: err.message };
   }
 }
+
+/**
+ * 7. Embudo Multimodular Conversacional
+ * Saludo personalizado (nuevo vs recurrente), selección de 4 servicios (traslado, delivery,
+ * mandaito, flete), captura de detalles y selección de método de pago (Pago Móvil vs Efectivo).
+ */
+export async function handleCustomerFunnelMessage(
+  chat: IWhatsAppChat,
+  text: string
+): Promise<{ handled: boolean; replyText?: string }> {
+  await dbConnect();
+  try {
+    const clean = text.trim();
+    const lower = clean.toLowerCase();
+    const cleanPhone = normalizeWhatsAppNumber(chat.customerPhone);
+
+    // Detectar si el cliente es recurrente en la base de datos
+    const messageCount = await WhatsAppMessage.countDocuments({ chatId: chat.chatId });
+    const isRecurring = messageCount > 2;
+
+    const currentStep = chat.conversationStep || "greeting";
+
+    // -------------------------------------------------------------------------
+    // PASO 1: SALUDO Y ELECCIÓN DE SERVICIO
+    // -------------------------------------------------------------------------
+    const isGreeting =
+      lower.startsWith("hola") ||
+      lower.startsWith("buenas") ||
+      lower.startsWith("buenos") ||
+      lower.startsWith("que tal") ||
+      lower.startsWith("saludos") ||
+      lower === "epale" ||
+      lower === "buenas tardes" ||
+      lower === "buenos dias" ||
+      lower === "buenas noches";
+
+    // Detección de servicios por sinónimos
+    const isTraslado =
+      lower.includes("traslado") ||
+      lower.includes("carrera") ||
+      lower.includes("mototaxi") ||
+      lower.includes("carrerita") ||
+      lower.includes("taxi") ||
+      lower.includes("llevarme") ||
+      lower.includes("cola") ||
+      lower === "1";
+
+    const isDelivery =
+      lower.includes("delivery") ||
+      lower.includes("comida") ||
+      lower.includes("hamburguesa") ||
+      lower.includes("pizza") ||
+      lower.includes("pollo") ||
+      lower.includes("comer") ||
+      lower.includes("almuerzo") ||
+      lower.includes("cena") ||
+      lower.includes("restaurante") ||
+      lower.includes("mcdonalds") ||
+      lower.includes("kfc") ||
+      lower === "2";
+
+    const isMandaito =
+      lower.includes("mandaito") ||
+      lower.includes("mandado") ||
+      lower.includes("encomienda") ||
+      lower.includes("paquete") ||
+      lower.includes("favor") ||
+      lower.includes("diligencia") ||
+      lower.includes("llaves") ||
+      lower === "3";
+
+    const isFlete =
+      lower.includes("flete") ||
+      lower.includes("mudanza") ||
+      lower.includes("carga") ||
+      lower.includes("camioneta") ||
+      lower.includes("camion") ||
+      lower.includes("bultos") ||
+      lower.includes("nevera") ||
+      lower === "4";
+
+    if (currentStep === "greeting" || (isGreeting && !chat.serviceType)) {
+      if (isTraslado || isDelivery || isMandaito || isFlete) {
+        // El cliente saludó y de una vez indicó el servicio
+        const selected = isTraslado ? "traslado" : isDelivery ? "delivery" : isMandaito ? "mandaito" : "flete";
+        chat.serviceType = selected;
+        chat.conversationStep = "awaiting_details";
+        await chat.save();
+
+        let promptDetails = "";
+        if (selected === "delivery") {
+          promptDetails = `🍔 ¡Excelente, servicio de *Delivery*!\n¿De cuál restaurante o local quieres pedir y qué te gustaría ordenar? (Ej. McDonald's, Burger House, una pizza...)`;
+        } else if (selected === "traslado") {
+          promptDetails = `🏍️ ¡Perfecto, servicio de *Traslado*!\n¿En qué dirección o punto exacto te encuentras y hacia dónde te trasladamos?`;
+        } else if (selected === "mandaito") {
+          promptDetails = `📦 ¡Listo, servicio de *Mandaito*!\n¿Qué encomienda o diligencia necesitas que retiremos, en qué dirección y a dónde la entregamos?`;
+        } else {
+          promptDetails = `🚚 ¡Entendido, servicio de *Flete*!\n¿Qué tipo de carga o bultos necesitas transportar y de qué punto a qué punto?`;
+        }
+
+        await sendMetaWhatsAppMessage({ to: cleanPhone, text: promptDetails });
+        return { handled: true, replyText: promptDetails };
+      }
+
+      // Saludo formal con menú de opciones
+      const welcomeHeader = isRecurring
+        ? `¡Hola! Espero estés bien. Qué gusto saludarte de nuevo en *Venpide* 🛵`
+        : `¡Bienvenido a *Venpide*! 🇻🇪 Tu central de pedidos, encomiendas y traslados rápidos.`;
+
+      const menuText = `${welcomeHeader}
+
+¿En qué te podemos ayudar el día de hoy?
+🛵 *1. Traslado* (Moto Taxi / Carro)
+🍔 *2. Delivery* (Comida y Restaurantes)
+📦 *3. Mandaito* (Diligencias / Encomiendas)
+🚚 *4. Flete* (Carga pesada / Camioneta)
+
+👉 Responde con el número o nombre del servicio.`;
+
+      chat.conversationStep = "awaiting_service";
+      await chat.save();
+
+      await sendMetaWhatsAppMessage({ to: cleanPhone, text: menuText });
+      return { handled: true, replyText: menuText };
+    }
+
+    // -------------------------------------------------------------------------
+    // PASO 2: SELECCIÓN DEL SERVICIO
+    // -------------------------------------------------------------------------
+    if (currentStep === "awaiting_service") {
+      let selected: "delivery" | "traslado" | "mandaito" | "flete" = "delivery";
+      if (isTraslado) selected = "traslado";
+      else if (isDelivery) selected = "delivery";
+      else if (isMandaito) selected = "mandaito";
+      else if (isFlete) selected = "flete";
+
+      chat.serviceType = selected;
+      chat.conversationStep = "awaiting_details";
+      await chat.save();
+
+      let promptDetails = "";
+      if (selected === "delivery") {
+        promptDetails = `🍔 ¡Excelente, servicio de *Delivery*!\n¿De cuál restaurante o local quieres pedir y qué te gustaría ordenar? (Ej. McDonald's, Burger House, una pizza...)`;
+      } else if (selected === "traslado") {
+        promptDetails = `🏍️ ¡Perfecto, servicio de *Traslado*!\n¿En qué dirección o punto exacto te encuentras y hacia dónde te trasladamos?`;
+      } else if (selected === "mandaito") {
+        promptDetails = `📦 ¡Listo, servicio de *Mandaito*!\n¿Qué encomienda o diligencia necesitas que retiremos, en qué dirección y a dónde la entregamos?`;
+      } else {
+        promptDetails = `🚚 ¡Entendido, servicio de *Flete*!\n¿Qué tipo de carga o bultos necesitas transportar y de qué punto a qué punto?`;
+      }
+
+      await sendMetaWhatsAppMessage({ to: cleanPhone, text: promptDetails });
+      return { handled: true, replyText: promptDetails };
+    }
+
+    // -------------------------------------------------------------------------
+    // PASO 3: CAPTURA DE DETALLES Y PREGUNTA POR MÉTODO DE PAGO
+    // -------------------------------------------------------------------------
+    if (currentStep === "awaiting_details") {
+      chat.notes = clean;
+      chat.lastMessage = clean;
+
+      // Si es delivery, intentar mapear restaurante
+      if (chat.serviceType === "delivery") {
+        const parsed = await parseCustomerOrder(clean, chat);
+        if (parsed.restaurant) {
+          chat.restaurantName = parsed.restaurant.name;
+          chat.restaurantPhone = parsed.restaurant.phone;
+          chat.restaurantGoogleMapsUrl = parsed.restaurant.googleMapsUrl;
+        }
+        if (parsed.deliveryAddress) {
+          chat.deliveryAddress = parsed.deliveryAddress;
+        }
+      } else {
+        chat.deliveryAddress = clean;
+      }
+
+      chat.conversationStep = "awaiting_payment_method";
+      await chat.save();
+
+      const paymentPrompt = `Anotado tu requerimiento. ✅
+
+Para coordinar el despacho inmediato, ¿cómo deseas realizar tu pago?
+
+👉 Responde *1* o *PAGO MOVIL*
+👉 Responde *2* o *EFECTIVO* ($ o Bs al recibir)`;
+
+      await sendMetaWhatsAppMessage({ to: cleanPhone, text: paymentPrompt });
+      return { handled: true, replyText: paymentPrompt };
+    }
+
+    // -------------------------------------------------------------------------
+    // PASO 4: ELECCIÓN DEL MÉTODO DE PAGO
+    // -------------------------------------------------------------------------
+    if (currentStep === "awaiting_payment_method") {
+      const isPagoMovil = lower === "1" || lower.includes("pago movil") || lower.includes("pagomovil") || lower.includes("transferencia");
+      const isEfectivo = lower === "2" || lower.includes("efectivo") || lower.includes("cash") || lower.includes("dolares") || lower.includes("dólares");
+
+      if (isPagoMovil) {
+        chat.paymentMethod = "pago_movil";
+        chat.conversationStep = "awaiting_payment_proof";
+        await chat.save();
+
+        const totalUsd = chat.totalAmount || 10;
+        const totalBs = totalUsd * 40;
+
+        const bankInstructions = `💳 *Datos oficiales para Pago Móvil Venpide:*
+• Banco: *Banesco (0134)* o *BDV (0102)*
+• Teléfono: *0412-1234567*
+• C.I.: *V-25.123.456*
+• Monto a pagar: *$${totalUsd} USD* (~Bs. ${totalBs.toLocaleString("es-VE")})
+
+------------------------------------------------
+👉 Una vez realizada la transferencia, envíanos por aquí el *número de referencia completo* o la *captura de pantalla* para verificarla automáticamente.`;
+
+        await sendMetaWhatsAppMessage({ to: cleanPhone, text: bankInstructions });
+        return { handled: true, replyText: bankInstructions };
+      }
+
+      if (isEfectivo) {
+        chat.paymentMethod = "efectivo";
+        chat.paymentStatus = "pending_verification";
+        chat.conversationStep = "dispatching";
+        chat.orderStage = chat.serviceType === "delivery" ? "pending_restaurant" : "broadcasting_drivers";
+        await chat.save();
+
+        const driverName = chat.assignedDriver?.name || "Wilmer";
+
+        const cashConfirmation = `✅ ¡Anotado pago en Efectivo!
+
+Tu pedido ha sido procesado. Nuestro motorizado *${driverName}* va en camino para atender tu servicio. 🛵
+Por favor ten a la mano el monto acordado ($ o Bs al cambio del día). Te avisaremos al llegar.`;
+
+        await sendMetaWhatsAppMessage({ to: cleanPhone, text: cashConfirmation });
+
+        // Si es delivery, notificar a restaurante
+        if (chat.serviceType === "delivery" && chat.restaurantPhone) {
+          await notifyRestaurantForAcceptance(chat);
+        } else {
+          await broadcastToDrivers(chat);
+        }
+
+        return { handled: true, replyText: cashConfirmation };
+      }
+    }
+
+    return { handled: false };
+  } catch (err: any) {
+    console.error("Error en handleCustomerFunnelMessage:", err);
+    return { handled: false };
+  }
+}
+

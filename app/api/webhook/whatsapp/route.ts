@@ -12,7 +12,9 @@ import {
   handleCustomerConfirmation,
   parseCustomerOrder,
   notifyRestaurantForAcceptance,
+  handleCustomerFunnelMessage,
 } from "@/lib/ai/deliveryCoordinator";
+import { processIncomingPaymentProof } from "@/lib/ai/pagoMovilVerifier";
 
 export const runtime = "nodejs";
 
@@ -205,20 +207,40 @@ export async function POST(req: NextRequest) {
             createdAt: new Date(),
           });
 
-          // 3.A. Verificar si el cliente está confirmando recepción final (SI / RECIBIDO)
+          // 3.A. Verificar si el mensaje es un comprobante de Pago Móvil (Texto con referencia o imagen OCR)
+          const proofResult = await processIncomingPaymentProof({
+            chatId: cleanFrom,
+            customerPhone: cleanFrom,
+            customerName: customerChat.customerName,
+            customerEmail: customerChat.customerEmail,
+            text: messageText,
+            imageUrl: msgType === "image" ? mediaUrl : undefined,
+          });
+
+          if (proofResult.handled) {
+            continue;
+          }
+
+          // 3.B. Verificar si el cliente está confirmando recepción final (SI / RECIBIDO)
           const confirmResult = await handleCustomerConfirmation(cleanFrom, messageText);
           if (confirmResult.success) {
             continue;
           }
 
-          // 3.B. Si el cliente tiene un conductor asignado, puentear el mensaje al chofer
-          if (customerChat.assignedDriver?.phone) {
+          // 3.C. Embudo Conversacional Multimodular (Saludo, Selección de 4 Servicios y Método de Pago)
+          const funnelResult = await handleCustomerFunnelMessage(customerChat, messageText);
+          if (funnelResult.handled) {
+            continue;
+          }
+
+          // 3.D. Si el cliente tiene un conductor asignado en ruta, puentear el mensaje al chofer
+          if (customerChat.assignedDriver?.phone && customerChat.status === "in_delivery") {
             await sendMetaWhatsAppMessage({
               to: customerChat.assignedDriver.phone,
               text: `[Cliente ${customerChat.customerName}]: ${messageText}`,
             });
           } else {
-            // 3.C. Asistente IA: Si no hay conductor asignado, analizar intención de pedido
+            // 3.E. Asistente IA de respaldo: Si no hay conductor asignado, analizar intención de pedido
             const parsed = await parseCustomerOrder(messageText, customerChat);
             if (parsed.isOrderIntent && parsed.restaurant) {
               customerChat.restaurantName = parsed.restaurant.name;
