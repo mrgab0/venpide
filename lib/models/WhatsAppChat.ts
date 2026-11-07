@@ -15,10 +15,25 @@ export interface IWhatsAppChat extends Document {
   customerPhone: string;
   assignedDriver?: IAssignedDriver;
   orderId?: string;
+  restaurantId?: string;
   restaurantName?: string;
+  restaurantPhone?: string;
+  restaurantGoogleMapsUrl?: string;
   deliveryAddress?: string;
   totalAmount?: number;
   cancellationReason?: string;
+  driverLiveLocationUrl?: string;
+  orderStage?:
+    | "draft"
+    | "pending_restaurant"
+    | "restaurant_accepted"
+    | "broadcasting_drivers"
+    | "driver_assigned"
+    | "in_delivery"
+    | "driver_delivered"
+    | "completed"
+    | "cancelled";
+  stageUpdatedAt?: Date;
   status: "open" | "assigned" | "in_delivery" | "delivered" | "closed" | "cancelled";
   lastMessage: string;
   lastSender: "customer" | "driver" | "admin" | "system";
@@ -50,10 +65,31 @@ const WhatsAppChatSchema: Schema = new Schema(
     customerPhone: { type: String, required: true, index: true },
     assignedDriver: { type: AssignedDriverSchema, default: null },
     orderId: { type: String, default: "" },
+    restaurantId: { type: String, default: "" },
     restaurantName: { type: String, default: "" },
+    restaurantPhone: { type: String, default: "" },
+    restaurantGoogleMapsUrl: { type: String, default: "" },
     deliveryAddress: { type: String, default: "" },
     totalAmount: { type: Number, default: 0 },
     cancellationReason: { type: String, default: "" },
+    driverLiveLocationUrl: { type: String, default: "" },
+    orderStage: {
+      type: String,
+      enum: [
+        "draft",
+        "pending_restaurant",
+        "restaurant_accepted",
+        "broadcasting_drivers",
+        "driver_assigned",
+        "in_delivery",
+        "driver_delivered",
+        "completed",
+        "cancelled",
+      ],
+      default: "draft",
+      index: true,
+    },
+    stageUpdatedAt: { type: Date, default: Date.now },
     status: {
       type: String,
       enum: ["open", "assigned", "in_delivery", "delivered", "closed", "cancelled"],

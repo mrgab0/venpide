@@ -348,6 +348,8 @@ export async function updateDeliveryDetailsAction(
   data: {
     orderId?: string;
     restaurantName?: string;
+    restaurantPhone?: string;
+    restaurantGoogleMapsUrl?: string;
     deliveryAddress?: string;
     totalAmount?: number;
     notes?: string;
@@ -362,6 +364,8 @@ export async function updateDeliveryDetailsAction(
 
     if (data.orderId !== undefined) chat.orderId = data.orderId.trim();
     if (data.restaurantName !== undefined) chat.restaurantName = data.restaurantName.trim();
+    if (data.restaurantPhone !== undefined) chat.restaurantPhone = normalizeWhatsAppNumber(data.restaurantPhone);
+    if (data.restaurantGoogleMapsUrl !== undefined) chat.restaurantGoogleMapsUrl = data.restaurantGoogleMapsUrl.trim();
     if (data.deliveryAddress !== undefined) chat.deliveryAddress = data.deliveryAddress.trim();
     if (data.totalAmount !== undefined) chat.totalAmount = Number(data.totalAmount) || 0;
     if (data.notes !== undefined) chat.notes = data.notes.trim();
@@ -397,6 +401,36 @@ ${chat.restaurantName ? `Restaurante: ${chat.restaurantName}\n` : ""}${chat.deli
   } catch (error: any) {
     console.error("Error al actualizar datos de entrega:", error);
     return { success: false, error: error.message };
+  }
+}
+
+export async function triggerRestaurantAlertAction(chatId: string) {
+  await dbConnect();
+  try {
+    const normalizedChatId = normalizeWhatsAppNumber(chatId);
+    const chat = await WhatsAppChat.findOne({ chatId: normalizedChatId });
+    if (!chat) return { success: false, error: "Conversación no encontrada" };
+
+    const { notifyRestaurantForAcceptance } = await import("@/lib/ai/deliveryCoordinator");
+    return await notifyRestaurantForAcceptance(chat);
+  } catch (err: any) {
+    console.error("Error al disparar alerta de restaurante:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function triggerDriverBroadcastAction(chatId: string) {
+  await dbConnect();
+  try {
+    const normalizedChatId = normalizeWhatsAppNumber(chatId);
+    const chat = await WhatsAppChat.findOne({ chatId: normalizedChatId });
+    if (!chat) return { success: false, error: "Conversación no encontrada" };
+
+    const { broadcastToDrivers } = await import("@/lib/ai/deliveryCoordinator");
+    return await broadcastToDrivers(chat);
+  } catch (err: any) {
+    console.error("Error al disparar convocatoria de conductores:", err);
+    return { success: false, error: err.message };
   }
 }
 

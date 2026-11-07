@@ -4,7 +4,15 @@ import { SiteConfig } from "@/lib/models/SiteConfig";
 import { WhatsAppChat } from "@/lib/models/WhatsAppChat";
 import { WhatsAppMessage } from "@/lib/models/WhatsAppMessage";
 import { Driver } from "@/lib/models/Driver";
+import { Restaurant } from "@/lib/models/Restaurant";
 import { sendMetaWhatsAppMessage, normalizeWhatsAppNumber } from "@/lib/utils/metaWhatsApp";
+import {
+  handleRestaurantReply,
+  handleDriverMessage,
+  handleCustomerConfirmation,
+  parseCustomerOrder,
+  notifyRestaurantForAcceptance,
+} from "@/lib/ai/deliveryCoordinator";
 
 export const runtime = "nodejs";
 
@@ -91,52 +99,72 @@ export async function POST(req: NextRequest) {
         const contactProfile = val.contacts?.[0]?.profile?.name || "";
 
         // =========================================================================
-        // 1. Verificar si el remitente es un Conductor (Driver) Registrado
+        // 1. Verificar si el remitente es un Restaurante Aliado Registrado
+        // =========================================================================
+        const restaurant = await Restaurant.findOne({ phone: cleanFrom });
+
+        if (restaurant) {
+          // El mensaje proviene del encargado del restaurante aliado
+          console.log(`[Meta Webhook] Mensaje de Restaurante ${restaurant.name}: ${messageText}`);
+          const restResult = await handleRestaurantReply(cleanFrom, messageText);
+          if (restResult.success) {
+            continue; // Acción procesada por el coordinador
+          }
+        }
+
+        // =========================================================================
+        // 2. Verificar si el remitente es un Conductor (Driver) Registrado
         // =========================================================================
         const driver = await Driver.findOne({ phone: cleanFrom });
 
         if (driver) {
           // El mensaje proviene de un conductor (mototaxi/repartidor)
-          let activeChat = await WhatsAppChat.findOne({
-            "assignedDriver.phone": cleanFrom,
-            status: { $in: ["assigned", "in_delivery", "open"] },
-          }).sort({ lastMessageAt: -1 });
+          console.log(`[Meta Webhook] Mensaje de Conductor ${driver.name}: ${messageText}`);
 
-          if (!activeChat) {
-            // Si no tiene chat asignado en curso, asociar al último abierto
-            activeChat = await WhatsAppChat.findOne({ status: "open" }).sort({ lastMessageAt: -1 });
-          }
+          // Intentar procesar comandos autónomos (TOMAR, ENTREGADO o Ubicación GPS)
+          const driverResult = await handleDriverMessage(driver, messageText, locationData);
 
-          if (activeChat) {
-            // Guardar en la conversación
-            await WhatsAppMessage.create({
-              chatId: activeChat.chatId,
-              metaMessageId,
-              senderType: "driver",
-              senderName: driver.name,
-              senderPhone: cleanFrom,
-              text: messageText,
-              mediaType: msgType === "location" ? "location" : "text",
-              location: locationData,
-              status: "delivered",
-              createdAt: new Date(),
-            });
+          if (!driverResult.success || driverResult.action === "none") {
+            // Si no fue comando de máquina de estados, actuar como puente de chat hacia el cliente
+            let activeChat = await WhatsAppChat.findOne({
+              "assignedDriver.phone": cleanFrom,
+              status: { $in: ["assigned", "in_delivery", "open"] },
+            }).sort({ lastMessageAt: -1 });
 
-            activeChat.lastMessage = messageText;
-            activeChat.lastSender = "driver";
-            activeChat.lastMessageAt = new Date();
-            activeChat.unreadAdminCount = (activeChat.unreadAdminCount || 0) + 1;
-            await activeChat.save();
+            if (!activeChat) {
+              activeChat = await WhatsAppChat.findOne({ status: "open" }).sort({ lastMessageAt: -1 });
+            }
 
-            // Reenviar mensaje al cliente automáticamente (puente de comunicación)
-            await sendMetaWhatsAppMessage({
-              to: activeChat.customerPhone,
-              text: `🛵 [Tu Conductor ${driver.name}]: ${messageText}`,
-            });
+            if (activeChat) {
+              await WhatsAppMessage.create({
+                chatId: activeChat.chatId,
+                metaMessageId,
+                senderType: "driver",
+                senderName: driver.name,
+                senderPhone: cleanFrom,
+                text: messageText,
+                mediaType: msgType === "location" ? "location" : "text",
+                location: locationData,
+                status: "delivered",
+                createdAt: new Date(),
+              });
+
+              activeChat.lastMessage = messageText;
+              activeChat.lastSender = "driver";
+              activeChat.lastMessageAt = new Date();
+              activeChat.unreadAdminCount = (activeChat.unreadAdminCount || 0) + 1;
+              await activeChat.save();
+
+              // Reenviar mensaje al cliente automáticamente (puente de comunicación)
+              await sendMetaWhatsAppMessage({
+                to: activeChat.customerPhone,
+                text: `🛵 [Tu Conductor ${driver.name}]: ${messageText}`,
+              });
+            }
           }
         } else {
           // =========================================================================
-          // 2. El mensaje proviene de un Cliente
+          // 3. El mensaje proviene de un Cliente
           // =========================================================================
           let customerChat = await WhatsAppChat.findOne({ chatId: cleanFrom });
 
@@ -146,6 +174,7 @@ export async function POST(req: NextRequest) {
               customerPhone: cleanFrom,
               customerName: contactProfile || `Cliente +${cleanFrom.slice(-4)}`,
               status: "open",
+              orderStage: "draft",
               unreadAdminCount: 1,
               lastMessage: messageText,
               lastSender: "customer",
@@ -176,12 +205,35 @@ export async function POST(req: NextRequest) {
             createdAt: new Date(),
           });
 
-          // Si hay un conductor asignado a este cliente, reenviarle el mensaje al chofer
+          // 3.A. Verificar si el cliente está confirmando recepción final (SI / RECIBIDO)
+          const confirmResult = await handleCustomerConfirmation(cleanFrom, messageText);
+          if (confirmResult.success) {
+            continue;
+          }
+
+          // 3.B. Si el cliente tiene un conductor asignado, puentear el mensaje al chofer
           if (customerChat.assignedDriver?.phone) {
             await sendMetaWhatsAppMessage({
               to: customerChat.assignedDriver.phone,
               text: `[Cliente ${customerChat.customerName}]: ${messageText}`,
             });
+          } else {
+            // 3.C. Asistente IA: Si no hay conductor asignado, analizar intención de pedido
+            const parsed = await parseCustomerOrder(messageText, customerChat);
+            if (parsed.isOrderIntent && parsed.restaurant) {
+              customerChat.restaurantName = parsed.restaurant.name;
+              customerChat.restaurantPhone = parsed.restaurant.phone;
+              customerChat.restaurantGoogleMapsUrl = parsed.restaurant.googleMapsUrl;
+              customerChat.deliveryAddress = parsed.deliveryAddress;
+              customerChat.totalAmount = parsed.totalEstimated;
+              await customerChat.save();
+
+              // Si el cliente dice expresamente "confirmar" o "si", disparar al restaurante
+              const upperMsg = messageText.toUpperCase();
+              if (upperMsg.includes("CONFIRMO") || upperMsg.includes("ACEPTO") || upperMsg === "SI") {
+                await notifyRestaurantForAcceptance(customerChat);
+              }
+            }
           }
         }
       }

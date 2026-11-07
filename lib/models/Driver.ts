@@ -1,4 +1,4 @@
-﻿import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface IDriver extends Document {
   name: string;
@@ -10,6 +10,8 @@ export interface IDriver extends Document {
   totalDeliveries?: number;
   activeOrderId?: string;
   activeChatId?: string;
+  liveLocationUrl?: string;
+  queuePosition?: number;
   notes?: string;
   photoUrl?: string;
   createdAt: Date;
@@ -35,6 +37,8 @@ const DriverSchema: Schema = new Schema(
     totalDeliveries: { type: Number, default: 0 },
     activeOrderId: { type: String, default: "" },
     activeChatId: { type: String, default: "" },
+    liveLocationUrl: { type: String, default: "" },
+    queuePosition: { type: Number, default: 0 },
     notes: { type: String, default: "" },
     photoUrl: { type: String, default: "" },
   },

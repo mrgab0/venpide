@@ -47,7 +47,15 @@ import {
   getMetaWhatsAppConfigAction,
   saveMetaWhatsAppConfigAction,
   simulateIncomingWhatsAppMessageAction,
+  triggerRestaurantAlertAction,
+  triggerDriverBroadcastAction,
 } from "@/lib/actions/whatsappCrm";
+import {
+  getRestaurantsAction,
+  saveRestaurantAction,
+  deleteRestaurantAction,
+  seedDefaultRestaurantsAction,
+} from "@/lib/actions/restaurant";
 
 export default function WhatsAppCrmPage() {
   // Conversaciones y mensajes
@@ -68,6 +76,15 @@ export default function WhatsAppCrmPage() {
   const [selectedDriverId, setSelectedDriverId] = useState("");
   const [assigningDriver, setAssigningDriver] = useState(false);
 
+  // Lista de Restaurantes Aliados
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [isRestaurantModalOpen, setIsRestaurantModalOpen] = useState(false);
+  const [editingRestaurant, setEditingRestaurant] = useState<any | null>(null);
+  const [savingRestaurant, setSavingRestaurant] = useState(false);
+  const [seedingRestaurants, setSeedingRestaurants] = useState(false);
+  const [triggeringRestaurant, setTriggeringRestaurant] = useState(false);
+  const [broadcastingDrivers, setBroadcastingDrivers] = useState(false);
+
   // Modales
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -84,6 +101,8 @@ export default function WhatsAppCrmPage() {
   const [deliveryForm, setDeliveryForm] = useState({
     orderId: "",
     restaurantName: "",
+    restaurantPhone: "",
+    restaurantGoogleMapsUrl: "",
     deliveryAddress: "",
     totalAmount: "",
     notes: "",
@@ -145,10 +164,18 @@ export default function WhatsAppCrmPage() {
     }
   };
 
+  const fetchRestaurants = async () => {
+    const res = await getRestaurantsAction();
+    if (res.success && res.restaurants) {
+      setRestaurants(res.restaurants);
+    }
+  };
+
   useEffect(() => {
     fetchChats();
     fetchDrivers();
     fetchMetaConfig();
+    fetchRestaurants();
   }, [filterStatus]);
 
   useEffect(() => {
@@ -245,6 +272,8 @@ export default function WhatsAppCrmPage() {
     setDeliveryForm({
       orderId: currentChat.orderId || "",
       restaurantName: currentChat.restaurantName || "",
+      restaurantPhone: currentChat.restaurantPhone || "",
+      restaurantGoogleMapsUrl: currentChat.restaurantGoogleMapsUrl || "",
       deliveryAddress: currentChat.deliveryAddress || "",
       totalAmount: currentChat.totalAmount !== undefined && currentChat.totalAmount !== null ? String(currentChat.totalAmount) : "",
       notes: currentChat.notes || "",
@@ -302,6 +331,8 @@ export default function WhatsAppCrmPage() {
     const res = await updateDeliveryDetailsAction(activeChatId, {
       orderId: deliveryForm.orderId,
       restaurantName: deliveryForm.restaurantName,
+      restaurantPhone: deliveryForm.restaurantPhone,
+      restaurantGoogleMapsUrl: deliveryForm.restaurantGoogleMapsUrl,
       deliveryAddress: deliveryForm.deliveryAddress,
       totalAmount: deliveryForm.totalAmount ? Number(deliveryForm.totalAmount) : 0,
       notes: deliveryForm.notes,
@@ -318,6 +349,88 @@ export default function WhatsAppCrmPage() {
     } else {
       alert("Error al guardar datos de delivery: " + res.error);
     }
+  };
+
+  const handleTriggerRestaurantAlert = async () => {
+    if (!activeChatId || triggeringRestaurant) return;
+    setTriggeringRestaurant(true);
+    const res = await triggerRestaurantAlertAction(activeChatId);
+    setTriggeringRestaurant(false);
+    if (res.success) {
+      alert("Notificación de pedido enviada al restaurante aliado por WhatsApp.");
+      fetchChats();
+      getWhatsAppMessagesAction(activeChatId).then((m) => {
+        if (m.success && m.messages) setMessages(m.messages);
+        scrollToBottom();
+      });
+    } else {
+      alert("Error al notificar restaurante: " + res.error);
+    }
+  };
+
+  const handleTriggerDriverBroadcast = async () => {
+    if (!activeChatId || broadcastingDrivers) return;
+    setBroadcastingDrivers(true);
+    const res = await triggerDriverBroadcastAction(activeChatId);
+    setBroadcastingDrivers(false);
+    if (res.success) {
+      alert("Convocatoria enviada a la flota de motorizados disponibles.");
+      fetchChats();
+      getWhatsAppMessagesAction(activeChatId).then((m) => {
+        if (m.success && m.messages) setMessages(m.messages);
+        scrollToBottom();
+      });
+    } else {
+      alert("Error al convocar choferes: " + res.error);
+    }
+  };
+
+  const handleSaveRestaurant = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSavingRestaurant(true);
+    const formData = new FormData(e.currentTarget);
+    const payload: any = {
+      name: formData.get("name") as string,
+      phone: formData.get("phone") as string,
+      address: formData.get("address") as string,
+      googleMapsUrl: formData.get("googleMapsUrl") as string,
+      category: formData.get("category") as string,
+      avgPrepTimeMin: Number(formData.get("avgPrepTimeMin") || 25),
+      menuSummary: formData.get("menuSummary") as string,
+      isActive: formData.get("isActive") === "on",
+    };
+    if (editingRestaurant?._id) payload._id = editingRestaurant._id;
+    const res = await saveRestaurantAction(payload);
+    setSavingRestaurant(false);
+    if (res.success) {
+      setEditingRestaurant(null);
+      fetchRestaurants();
+    } else {
+      alert("Error al guardar restaurante: " + res.error);
+    }
+  };
+
+  const handleDeleteRestaurant = async (id: string) => {
+    if (!confirm("¿Eliminar este restaurante aliado?")) return;
+    const res = await deleteRestaurantAction(id);
+    if (res.success) {
+      fetchRestaurants();
+    } else {
+      alert("Error al eliminar restaurante");
+    }
+  };
+
+  const handleSeedRestaurants = async () => {
+    setSeedingRestaurants(true);
+    const res = await seedDefaultRestaurantsAction();
+    setSeedingRestaurants(false);
+    if (res.success) {
+      fetchRestaurants();
+      alert("Restaurantes semilla cargados correctamente.");
+    } else {
+      alert("Error: " + res.error);
+    }
+  };
   };
 
   // =========================================================================
@@ -452,6 +565,18 @@ export default function WhatsAppCrmPage() {
 
         {/* Acciones Rápidas */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Botón Restaurantes Aliados */}
+          <button
+            onClick={() => {
+              setEditingRestaurant(null);
+              setIsRestaurantModalOpen(true);
+            }}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Store size={15} className="text-amber-600 dark:text-amber-400" />
+            <span>Restaurantes ({restaurants.length})</span>
+          </button>
+
           {/* Botón Flota de Drivers */}
           <button
             onClick={() => {
@@ -487,6 +612,7 @@ export default function WhatsAppCrmPage() {
             onClick={() => {
               fetchChats();
               fetchDrivers();
+              fetchRestaurants();
             }}
             className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-stone-800 text-gray-600 dark:text-stone-300 transition-colors"
             title="Recargar conversaciones"
@@ -969,6 +1095,21 @@ export default function WhatsAppCrmPage() {
             </div>
 
             <div className="space-y-2 text-xs">
+              {/* Etapa de Flujo de 4 Vías */}
+              {currentChat?.orderStage && (
+                <div className="p-2 rounded-xl bg-gray-50 dark:bg-stone-900 border border-gray-100 dark:border-stone-800 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase">Fase Orquestación:</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                    {currentChat.orderStage === "pending_restaurant" && "🟠 Esperando Restaurante"}
+                    {currentChat.orderStage === "restaurant_accepted" && "🍳 En Cocina / Preparando"}
+                    {currentChat.orderStage === "broadcasting_drivers" && "📢 Convocando Choferes"}
+                    {currentChat.orderStage === "in_delivery" && "🛵 Chofer en Ruta"}
+                    {currentChat.orderStage === "driver_delivered" && "📦 Esperando Confirmación"}
+                    {currentChat.orderStage === "completed" && "🟢 Finalizado"}
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between py-1 border-b border-gray-100 dark:border-stone-800">
                 <span className="text-gray-500 dark:text-stone-400">Orden Ref:</span>
                 <span className="font-mono font-bold text-gray-900 dark:text-white">
@@ -979,10 +1120,54 @@ export default function WhatsAppCrmPage() {
                 <span className="text-gray-500 dark:text-stone-400 flex items-center gap-1">
                   <Store size={12} /> Restaurante / Local:
                 </span>
-                <span className="font-bold text-gray-900 dark:text-white text-right truncate max-w-[140px]">
-                  {currentChat?.restaurantName || "No especificado"}
-                </span>
+                <div className="text-right">
+                  <span className="font-bold text-gray-900 dark:text-white block truncate max-w-[140px]">
+                    {currentChat?.restaurantName || "No especificado"}
+                  </span>
+                  {currentChat?.restaurantPhone && (
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      📞 +{currentChat.restaurantPhone}
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {/* Enlace Google Maps del Restaurante */}
+              {currentChat?.restaurantGoogleMapsUrl && (
+                <div className="p-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1">
+                    <MapPin size={12} className="text-blue-600" /> Retiro (Google Maps):
+                  </span>
+                  <a
+                    href={currentChat.restaurantGoogleMapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 flex items-center gap-1 underline"
+                  >
+                    <span>Ver Mapa</span>
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              )}
+
+              {/* Enlace GPS en Tiempo Real del Conductor */}
+              {currentChat?.driverLiveLocationUrl && (
+                <div className="p-2 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1">
+                    <Radio size={12} className="text-emerald-600 animate-pulse" /> GPS en Vivo:
+                  </span>
+                  <a
+                    href={currentChat.driverLiveLocationUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] font-bold text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 flex items-center gap-1 underline"
+                  >
+                    <span>Rastrear Chofer</span>
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              )}
+
               <div className="flex items-center justify-between py-1 border-b border-gray-100 dark:border-stone-800">
                 <span className="text-gray-500 dark:text-stone-400 flex items-center gap-1">
                   <MapPin size={12} /> Dirección Entrega:
@@ -1014,6 +1199,26 @@ export default function WhatsAppCrmPage() {
 
             {/* Botones de acción logística */}
             <div className="space-y-1.5 pt-2 border-t border-gray-100 dark:border-stone-800">
+              {/* Acciones de Orquestación 4 Vías */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={handleTriggerRestaurantAlert}
+                  disabled={!currentChat || triggeringRestaurant}
+                  className="py-1.5 px-2 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 font-bold text-[10px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                  title="Enviar solicitud formal al restaurante por WhatsApp con botones 1/2"
+                >
+                  <Store size={11} /> {triggeringRestaurant ? "..." : "🔔 Avisar Restaurante"}
+                </button>
+                <button
+                  onClick={handleTriggerDriverBroadcast}
+                  disabled={!currentChat || broadcastingDrivers}
+                  className="py-1.5 px-2 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 font-bold text-[10px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                  title="Convocar a todos los motorizados disponibles con Google Maps link"
+                >
+                  <Bike size={11} /> {broadcastingDrivers ? "..." : "📢 Convocar Choferes"}
+                </button>
+              </div>
+
               <button
                 onClick={openEditDeliveryModal}
                 disabled={!currentChat}
@@ -1480,14 +1685,37 @@ export default function WhatsAppCrmPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Restaurante / Comercio</label>
+                  <input
+                    type="text"
+                    value={deliveryForm.restaurantName}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, restaurantName: e.target.value })}
+                    placeholder="Ej. Burger House Centro"
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">WhatsApp Restaurante</label>
+                  <input
+                    type="text"
+                    value={deliveryForm.restaurantPhone}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, restaurantPhone: e.target.value })}
+                    placeholder="Ej. 584141234567"
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white font-mono"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Restaurante / Comercio (Punto de retiro)</label>
+                <label className="text-[10px] font-bold text-gray-500 uppercase">URL Google Maps del Restaurante (Punto de Retiro)</label>
                 <input
-                  type="text"
-                  value={deliveryForm.restaurantName}
-                  onChange={(e) => setDeliveryForm({ ...deliveryForm, restaurantName: e.target.value })}
-                  placeholder="Ej. Burger House Centro"
-                  className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white"
+                  type="url"
+                  value={deliveryForm.restaurantGoogleMapsUrl}
+                  onChange={(e) => setDeliveryForm({ ...deliveryForm, restaurantGoogleMapsUrl: e.target.value })}
+                  placeholder="https://maps.google.com/?q=10.4806,-66.9036"
+                  className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-gray-900 dark:text-white font-mono"
                 />
               </div>
 
@@ -1642,6 +1870,226 @@ export default function WhatsAppCrmPage() {
               >
                 {cancellingDelivery ? "Cancelando..." : "Confirmar Cancelación"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 6: GESTIÓN DE RESTAURANTES ALIADOS */}
+      {/* ========================================================================= */}
+      {isRestaurantModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#12131A] rounded-2xl border border-gray-200 dark:border-stone-800 max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-stone-800 pb-3">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Store size={18} className="text-amber-600" />
+                Restaurantes Aliados Venpide
+              </h2>
+              <button
+                onClick={() => {
+                  setIsRestaurantModalOpen(false);
+                  setEditingRestaurant(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-bold">🗺️ Coordinación de 4 Vías & Google Maps:</p>
+                <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                  Al recibir un pedido, la IA de Venpide notifica al WhatsApp del restaurante. Cuando acepta, su link de Google Maps se envía de inmediato al motorizado asignado para el retiro.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSeedRestaurants}
+                disabled={seedingRestaurants}
+                className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition-colors cursor-pointer"
+              >
+                {seedingRestaurants ? "Cargando..." : "⚡ Cargar Semillas"}
+              </button>
+            </div>
+
+            {/* Formulario Agregar/Editar Restaurante */}
+            <form onSubmit={handleSaveRestaurant} className="p-4 bg-gray-50 dark:bg-stone-900/60 rounded-xl space-y-3">
+              <h4 className="text-xs font-bold text-gray-800 dark:text-white">
+                {editingRestaurant ? `Editar Restaurante: ${editingRestaurant.name}` : "Registrar Nuevo Restaurante Aliado"}
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Nombre del Comercio</label>
+                  <input
+                    name="name"
+                    defaultValue={editingRestaurant?.name || ""}
+                    required
+                    placeholder="Ej. Burger House Centro"
+                    className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">WhatsApp Oficial</label>
+                  <input
+                    name="phone"
+                    defaultValue={editingRestaurant?.phone || ""}
+                    required
+                    placeholder="Ej. 584141234567"
+                    className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-gray-900 dark:text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Categoría</label>
+                  <input
+                    name="category"
+                    defaultValue={editingRestaurant?.category || "Comida rápida"}
+                    placeholder="Ej. Hamburguesas, Pizzas, Pollo"
+                    className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Tiempo Promedio Cocina (Minutos)</label>
+                  <input
+                    name="avgPrepTimeMin"
+                    type="number"
+                    defaultValue={editingRestaurant?.avgPrepTimeMin || 25}
+                    placeholder="25"
+                    className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Dirección Física</label>
+                  <input
+                    name="address"
+                    defaultValue={editingRestaurant?.address || ""}
+                    required
+                    placeholder="Ej. Av. Bolívar c/ Calle 4, Local 12"
+                    className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">URL Google Maps (Ubicación para el Motorizado)</label>
+                  <input
+                    name="googleMapsUrl"
+                    type="url"
+                    defaultValue={editingRestaurant?.googleMapsUrl || ""}
+                    required
+                    placeholder="https://maps.google.com/?q=10.4806,-66.9036"
+                    className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-gray-900 dark:text-white font-mono"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Resumen de Menú / Platos Principales</label>
+                  <input
+                    name="menuSummary"
+                    defaultValue={editingRestaurant?.menuSummary || ""}
+                    placeholder="Hamburguesas clásicas, dobles, papas fritas, bebidas..."
+                    className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="sm:col-span-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isActiveRestaurant"
+                    name="isActive"
+                    defaultChecked={editingRestaurant ? editingRestaurant.isActive !== false : true}
+                    className="rounded text-amber-600 focus:ring-amber-500"
+                  />
+                  <label htmlFor="isActiveRestaurant" className="text-xs font-bold text-gray-800 dark:text-stone-200 cursor-pointer">
+                    Restaurante Activo (Acepta pedidos automáticos de Venpide)
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                {editingRestaurant && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingRestaurant(null)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-200 dark:bg-stone-700 text-gray-700 dark:text-stone-300"
+                  >
+                    Cancelar Edición
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={savingRestaurant}
+                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors cursor-pointer"
+                >
+                  {savingRestaurant ? "Guardando..." : editingRestaurant ? "Guardar Cambios" : "Registrar Restaurante"}
+                </button>
+              </div>
+            </form>
+
+            {/* Listado de Restaurantes Existentes */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-gray-500 uppercase">Restaurantes Registrados ({restaurants.length})</h4>
+              {restaurants.length === 0 ? (
+                <div className="p-6 text-center text-xs text-gray-400 bg-gray-50 dark:bg-stone-900 rounded-xl">
+                  No hay restaurantes aliados registrados aún. Pulsa <strong>⚡ Cargar Semillas</strong> arriba para añadir los comercios por defecto.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 dark:divide-stone-800 border border-gray-100 dark:border-stone-800 rounded-xl overflow-hidden">
+                  {restaurants.map((r) => (
+                    <div key={r._id} className="p-3.5 flex items-center justify-between gap-3 bg-white dark:bg-stone-900">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 flex items-center justify-center font-bold text-sm shrink-0">
+                          🏪
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <span className="truncate">{r.name}</span>
+                            <span
+                              className={`text-[9px] px-1.5 py-0.2 rounded font-bold shrink-0 ${
+                                r.isActive !== false
+                                  ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300"
+                                  : "bg-gray-100 text-gray-500 dark:bg-stone-800"
+                              }`}
+                            >
+                              {r.isActive !== false ? "Activo" : "Pausado"}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 font-mono shrink-0">
+                              ⏱️ ~{r.avgPrepTimeMin || 25} min
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-gray-500 dark:text-stone-400 font-mono truncate mt-0.5">
+                            📞 +{r.phone} • {r.address}
+                          </div>
+                          {r.googleMapsUrl && (
+                            <a
+                              href={r.googleMapsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mt-0.5"
+                            >
+                              <MapPin size={10} /> {r.googleMapsUrl}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => setEditingRestaurant(r)}
+                          className="p-1.5 text-gray-400 hover:text-amber-600 transition-colors cursor-pointer"
+                          title="Editar restaurante"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRestaurant(r._id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                          title="Eliminar restaurante"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
