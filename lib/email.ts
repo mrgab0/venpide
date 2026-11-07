@@ -480,7 +480,7 @@ export async function sendPagoMovilReceiptEmail(
 
     // 1. Enviar email al cliente si tiene correo disponible
     if (options.customerEmail && options.customerEmail.includes("@")) {
-      const clientRes = await sendCorporateEmail({
+      const clientRes = await sendEmail({
         to: options.customerEmail,
         subject: `✅ Factura de Pago Confirmado #${options.orderId} - Venpide Delivery`,
         html: htmlContent,
@@ -491,7 +491,7 @@ export async function sendPagoMovilReceiptEmail(
     // 2. Enviar copia de auditoría a los administradores / jefe
     const adminRecipients = config.adminEmails.filter(Boolean);
     if (adminRecipients.length > 0) {
-      const adminRes = await sendCorporateEmail({
+      const adminRes = await sendEmail({
         to: adminRecipients,
         subject: `🔔 [Auditoría Cobranza] Pago Móvil Verificado: #${options.orderId} (Ref: ${options.reference})`,
         html: htmlContent,
