@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 const ADMIN_COOKIE_NAME = "ffy_admin_session";
 
 // Contraseña por defecto o la configurada en la variable de entorno
-const getAdminPassword = () => process.env.ADMIN_PASSWORD || "Gpflowers2026$";
+const getAdminPassword = () => process.env.ADMIN_PASSWORD || "venpide";
 
 import dbConnect from "@/lib/db";
 import { SiteConfig } from "@/lib/models/SiteConfig";
@@ -25,8 +25,9 @@ export async function loginAdminAction(formData: FormData): Promise<{
 
   const expectedPassword = getAdminPassword();
 
-  // Permite el ingreso con la clave oficial Gpflowers2026$ o variable de entorno
+  // Permite el ingreso con la clave oficial venpide, la anterior Gpflowers2026$ o variable de entorno
   const isValid =
+    password.trim() === "venpide" ||
     password.trim() === "Gpflowers2026$" ||
     password.trim() === expectedPassword.trim();
 
