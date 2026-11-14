@@ -572,9 +572,9 @@ export async function getMetaWhatsAppConfigAction() {
     return {
       success: true,
       config: (config as any)?.metaWhatsAppConfig || {
-        phoneNumberId: "",
-        wabaId: "",
-        accessToken: "",
+        phoneNumberId: "106327739241258",
+        wabaId: "147526331778220",
+        accessToken: "EAAxDP8afaJEBS7wjcDQwBdP99BZBqZB7i8iglDoZB4NOhheJ7ZBdJDlzumJMBbp7gnopqqJFrWWcmgcURQHYrZCf6AH4tTXPXG5RDa8jVfmRBhgXWZACOGgqYf4hc2Uctwxtaly5cVxPKndmgWfIe1QzNQ0kHR3fgB0vLVhVVqjKJkUbAhVQKnDn4GJplzgdOOMEyyO0ZCnDuEPptp9CHi3hv9NFbTsmA7R9h8ZD",
         verifyToken: "venpide_webhook_token_2026",
         webhookUrl: "/api/webhook/whatsapp",
         autoForwardToDriver: true,

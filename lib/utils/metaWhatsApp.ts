@@ -44,9 +44,13 @@ export async function sendMetaWhatsAppMessage({
     const metaConfig = (configDoc as any)?.metaWhatsAppConfig;
 
     const phoneNumberId =
-      metaConfig?.phoneNumberId || process.env.META_WA_PHONE_NUMBER_ID || "";
+      metaConfig?.phoneNumberId ||
+      process.env.META_WA_PHONE_NUMBER_ID ||
+      "106327739241258";
     const accessToken =
-      metaConfig?.accessToken || process.env.META_WA_ACCESS_TOKEN || "";
+      metaConfig?.accessToken ||
+      process.env.META_WA_ACCESS_TOKEN ||
+      "EAAxDP8afaJEBS7wjcDQwBdP99BZBqZB7i8iglDoZB4NOhheJ7ZBdJDlzumJMBbp7gnopqqJFrWWcmgcURQHYrZCf6AH4tTXPXG5RDa8jVfmRBhgXWZACOGgqYf4hc2Uctwxtaly5cVxPKndmgWfIe1QzNQ0kHR3fgB0vLVhVVqjKJkUbAhVQKnDn4GJplzgdOOMEyyO0ZCnDuEPptp9CHi3hv9NFbTsmA7R9h8ZD";
 
     const recipient = normalizeWhatsAppNumber(to);
 
